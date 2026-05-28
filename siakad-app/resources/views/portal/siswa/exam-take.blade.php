@@ -230,7 +230,6 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl text-center">
             <p class="text-5xl mb-3">🎉</p>
             <h3 class="text-lg font-bold text-slate-800 mb-2">Ujian Selesai!</h3>
-            <p class="text-sm text-slate-500 mb-4">Jawaban Anda telah dikumpulkan.</p>
             <div id="resultScore" class="mb-4"></div>
             <a href="/portal/siswa/exams" class="btn-accent w-full py-2.5 rounded-lg text-sm font-semibold inline-block">Kembali ke Daftar Ujian</a>
         </div>
@@ -1053,7 +1052,6 @@
                     `;
                 } else {
                     resultHtml = `
-                        <div class="text-4xl mb-3">📝</div>
                         <p class="text-sm text-slate-700 font-medium mb-1">Jawaban telah dikumpulkan!</p>
                         <p class="text-xs text-slate-400">${rd.needs_grading ? 'Hasil ujian akan diumumkan oleh guru setelah dikoreksi.' : 'Hasil akan diumumkan oleh guru.'}</p>
                     `;
