@@ -8,6 +8,20 @@
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
     .modal-overlay.show { display: flex; }
     .modal-box { background: white; border-radius: 16px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+    /* Searchable Select */
+    .searchable-select { position: relative; }
+    .searchable-select__input-wrap { position: relative; }
+    .searchable-select__input-wrap input { padding-right: 2rem; }
+    .searchable-select__arrow { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; transition: transform 0.2s; }
+    .searchable-select.open .searchable-select__arrow { transform: translateY(-50%) rotate(180deg); }
+    .searchable-select__dropdown { position: absolute; z-index: 60; top: 100%; left: 0; right: 0; margin-top: 4px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; max-height: 200px; overflow-y: auto; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+    .searchable-select__dropdown.hidden { display: none; }
+    .searchable-select__option { padding: 8px 12px; cursor: pointer; font-size: 0.875rem; color: #334155; transition: background 0.15s; }
+    .searchable-select__option:hover,
+    .searchable-select__option.active { background: #f1f5f9; }
+    .searchable-select__option.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
+    .searchable-select__option.no-result { color: #94a3b8; cursor: default; text-align: center; }
+    .searchable-select__option.no-result:hover { background: transparent; }
 </style>
 @endpush
 
@@ -97,7 +111,7 @@
                 </td>
                 <td class="px-5 py-3.5">
                     <div class="flex gap-1">
-                        <button data-edit-id="{{ $user->id }}" data-edit-name="{{ $user->name }}" data-edit-email="{{ $user->email }}" data-edit-role="{{ $user->role }}" class="p-1.5 rounded-lg hover:bg-accent-50 text-slate-400 hover:text-accent transition js-edit-btn" title="Edit">
+                        <button data-edit-id="{{ $user->id }}" data-edit-name="{{ $user->name }}" data-edit-email="{{ $user->email }}" data-edit-role="{{ $user->role }}" data-edit-guardian-nama="{{ $user->guardian?->nama_lengkap }}" data-edit-guardian-jk="{{ $user->guardian?->jk }}" data-edit-guardian-hubungan="{{ $user->guardian?->hubungan }}" data-edit-guardian-pekerjaan="{{ $user->guardian?->pekerjaan }}" data-edit-guardian-phone="{{ $user->guardian?->phone }}" data-edit-guardian-alamat="{{ $user->guardian?->alamat }}" data-edit-guardian-student-id="{{ $user->guardian?->students?->first()?->id }}" class="p-1.5 rounded-lg hover:bg-accent-50 text-slate-400 hover:text-accent transition js-edit-btn" title="Edit">
                             <i data-lucide="pencil" class="w-4 h-4"></i>
                         </button>
                         <form method="POST" action="{{ route('master.users.delete', $user->id) }}" onsubmit="event.preventDefault(); showConfirm('Hapus permanen user ini?', 'Hapus User', 'Ya, Hapus', () => this.submit());" class="inline">
@@ -251,6 +265,69 @@
                     <input type="file" name="photo" accept="image/jpeg,image/png,image/jpg" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
                 </div>
             </div>
+            {{-- Fields khusus Orang Tua / Wali --}}
+            <div id="guardianSection" style="display:none;">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama Lengkap <span class="text-red-400">*</span></label>
+                    <input type="text" name="guardian_nama" id="guardianNama" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                </div>
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Kelamin <span class="text-red-400">*</span></label>
+                        <select name="guardian_jk" id="guardianJk" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                            <option value="">Pilih</option>
+                            <option value="L">Laki-laki</option>
+                            <option value="P">Perempuan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Hubungan <span class="text-red-400">*</span></label>
+                        <select name="guardian_hubungan" id="guardianHubungan" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                            <option value="">Pilih</option>
+                            <option value="Ayah">Ayah</option>
+                            <option value="Ibu">Ibu</option>
+                            <option value="Wali">Wali</option>
+                            <option value="Kakek">Kakek</option>
+                            <option value="Nenek">Nenek</option>
+                            <option value="Paman">Paman</option>
+                            <option value="Bibi">Bibi</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Pekerjaan</label>
+                        <input type="text" name="guardian_pekerjaan" id="guardianPekerjaan" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">No. Telepon</label>
+                        <input type="text" name="guardian_phone" id="guardianPhone" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Alamat</label>
+                    <textarea name="guardian_alamat" id="guardianAlamat" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Anak (Siswa)</label>
+                    <div class="searchable-select" id="studentSearchSelect">
+                        <div class="searchable-select__input-wrap">
+                            <input type="text" id="studentSearchInput" placeholder="Cari nama siswa..." autocomplete="off" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
+                            <i data-lucide="chevron-down" class="searchable-select__arrow w-4 h-4 text-slate-400"></i>
+                        </div>
+                        <div class="searchable-select__dropdown hidden" id="studentSearchDropdown">
+                            <div class="searchable-select__option" data-value="" data-text="-- Tidak memilih --">-- Tidak memilih --</div>
+                            @foreach($students as $s)
+                            <div class="searchable-select__option" data-value="{{ $s->id }}" data-text="{{ strtolower($s->nama_lengkap) }} {{ strtolower($s->nis) }}">{{ $s->nama_lengkap }} <span class="text-slate-400 text-xs">({{ $s->nis }})</span></div>
+                            @endforeach
+                        </div>
+                        <input type="hidden" name="student_id" id="guardianStudentId" value="">
+                    </div>
+                    @if($students->isEmpty())
+                    <p class="text-xs text-slate-400 mt-1">Belum ada data siswa. Link ke siswa bisa dilakukan nanti.</p>
+                    @endif
+                </div>
+            </div>
             <div class="flex gap-3 pt-2">
                 <button type="submit" class="flex-1 px-4 py-2.5 rounded-xl btn-accent text-white text-sm font-medium hover:brightness-110 transition">Simpan</button>
                 <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition">Batal</button>
@@ -266,6 +343,7 @@ function toggleRoleFields() {
     var role = document.getElementById('inputRole').value;
     document.getElementById('subjectSection').style.display = (role === 'guru') ? 'block' : 'none';
     document.getElementById('studentSection').style.display = (role === 'siswa') ? 'block' : 'none';
+    document.getElementById('guardianSection').style.display = (role === 'orang_tua') ? 'block' : 'none';
 }
 function openModal() {
     document.getElementById('modalTitle').textContent = 'Tambah User';
@@ -278,10 +356,15 @@ function openModal() {
     document.getElementById('inputRole').value = '';
     document.getElementById('subjectSection').style.display = 'none';
     document.getElementById('studentSection').style.display = 'none';
+    document.getElementById('guardianSection').style.display = 'none';
     // Clear student fields
     var s = document.getElementById('studentSection');
     s.querySelectorAll('input[type=text], input[type=date], textarea, select').forEach(el => el.value = '');
     s.querySelector('input[type=file]') && (s.querySelector('input[type=file]').value = '');
+    // Clear guardian fields
+    var g = document.getElementById('guardianSection');
+    g.querySelectorAll('input[type=text], textarea').forEach(el => el.value = '');
+    g.querySelectorAll('select').forEach(el => el.value = '');
     // Uncheck all subject checkboxes
     document.querySelectorAll('#subjectSection input[type=checkbox]').forEach(cb => cb.checked = false);
     document.getElementById('userModal').classList.add('show');
@@ -297,6 +380,7 @@ function editUser(id, name, email, role) {
     document.getElementById('inputRole').value = role;
     document.getElementById('subjectSection').style.display = (role === 'guru') ? 'block' : 'none';
     document.getElementById('studentSection').style.display = 'none'; // Edit user tidak tampilkan field siswa
+    document.getElementById('guardianSection').style.display = (role === 'orang_tua') ? 'block' : 'none';
     document.getElementById('userModal').classList.add('show');
 }
 function closeModal() { document.getElementById('userModal').classList.remove('show'); }
@@ -307,6 +391,17 @@ document.addEventListener('DOMContentLoaded', function() {
         var btn = e.target.closest('.js-edit-btn');
         if (!btn) return;
         editUser(btn.dataset.editId, btn.dataset.editName, btn.dataset.editEmail, btn.dataset.editRole);
+        // Populate guardian fields from data attributes
+        var role = btn.dataset.editRole;
+        if (role === 'orang_tua') {
+            document.getElementById('guardianNama').value = btn.dataset.editGuardianNama || '';
+            document.getElementById('guardianJk').value = btn.dataset.editGuardianJk || '';
+            document.getElementById('guardianHubungan').value = btn.dataset.editGuardianHubungan || '';
+            document.getElementById('guardianPekerjaan').value = btn.dataset.editGuardianPekerjaan || '';
+            document.getElementById('guardianPhone').value = btn.dataset.editGuardianPhone || '';
+            document.getElementById('guardianAlamat').value = btn.dataset.editGuardianAlamat || '';
+            document.getElementById('guardianStudentId').value = btn.dataset.editGuardianStudentId || '';
+        }
     });
     // Modal click-outside-to-close
     var modal = document.getElementById('userModal');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\ClassSubject;
+use App\Models\Guardian;
 use App\Models\Major;
 use App\Models\SchoolClass;
 use App\Models\School;
@@ -31,7 +32,8 @@ class MasterController extends Controller
     public function users(Request $request)
     {
         $perPage = $this->perPage($request);
-        $users = User::where('school_id', $this->schoolId())
+        $users = User::with('guardian')
+            ->where('school_id', $this->schoolId())
             ->when($request->role, fn($q, $r) => $q->where('role', $r))
             ->when($request->filled('status'), fn($q) => $q->where('is_active', $request->status === 'aktif'))
             ->when($request->search, fn($q, $s) => $q->where(fn($q) => 
@@ -39,7 +41,8 @@ class MasterController extends Controller
             ))
             ->orderBy('name')->paginate($perPage)->withQueryString();
         $subjects = Subject::where('school_id', $this->schoolId())->where('is_active', true)->orderBy('code')->get();
-        return view('backend.master.users', compact('users', 'subjects', 'perPage'));
+        $students = Student::where('school_id', $this->schoolId())->where('status', 'aktif')->orderBy('nama_lengkap')->get();
+        return view('backend.master.users', compact('users', 'subjects', 'students', 'perPage'));
     }
 
     public function storeUser(Request $request)
@@ -54,13 +57,21 @@ class MasterController extends Controller
             // Data siswa (jika role=siswa)
             'nis'      => 'required_if:role,siswa|string|max:20',
             'nisn'     => 'required_if:role,siswa|string|max:10|unique:students,nisn',
-            'jk'       => 'required_if:role,siswa|in:L,P',
+            'jk'       => 'nullable|in:L,P',
             'tempat_lahir'   => 'nullable|string|max:100',
             'tanggal_lahir'  => 'nullable|date',
             'agama'     => 'nullable|string|max:20',
             'alamat'    => 'nullable|string',
             'class_id'  => 'nullable|exists:classes,id',
             'photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // Data orang tua / wali (jika role=orang_tua)
+            'guardian_nama'     => 'required_if:role,orang_tua|string|max:200',
+            'guardian_jk'       => 'required_if:role,orang_tua|in:L,P',
+            'guardian_hubungan' => 'required_if:role,orang_tua|string|max:50',
+            'guardian_pekerjaan' => 'nullable|string|max:100',
+            'guardian_phone'    => 'nullable|string|max:20',
+            'guardian_alamat'   => 'nullable|string',
+            'student_id'        => 'nullable|exists:students,id',
         ]);
         $data['school_id'] = $this->schoolId();
         $data['is_active'] = true;
@@ -92,6 +103,25 @@ class MasterController extends Controller
             ]);
         }
 
+        // Jika role orang_tua, buat data Guardian
+        if ($data['role'] === 'orang_tua') {
+            $guardian = Guardian::create([
+                'user_id'      => $user->id,
+                'nama_lengkap' => $request->guardian_nama,
+                'jk'           => $request->guardian_jk,
+                'hubungan'     => $request->guardian_hubungan,
+                'pekerjaan'    => $request->guardian_pekerjaan,
+                'phone'        => $request->guardian_phone,
+                'alamat'       => $request->guardian_alamat,
+            ]);
+
+            // Link ke siswa (anak) jika dipilih
+            if ($request->filled('student_id')) {
+                $student = Student::findOrFail($request->student_id);
+                $guardian->students()->attach($student->id, ['is_primary' => true]);
+            }
+        }
+
         // Assign mata pelajaran untuk role guru
         if ($data['role'] === 'guru' && $request->filled('subject_ids')) {
             $subjectIds = (array) $request->subject_ids;
@@ -121,11 +151,39 @@ class MasterController extends Controller
             'nip'   => 'nullable|string|max:30',
             'phone' => 'nullable|string|max:20',
             'is_active' => 'boolean',
+            // Data orang tua / wali
+            'guardian_nama'     => 'nullable|string|max:200',
+            'guardian_jk'       => 'nullable|in:L,P',
+            'guardian_hubungan' => 'nullable|string|max:50',
+            'guardian_pekerjaan' => 'nullable|string|max:100',
+            'guardian_phone'    => 'nullable|string|max:20',
+            'guardian_alamat'   => 'nullable|string',
+            'student_id'        => 'nullable|exists:students,id',
         ]);
         if ($request->filled('password')) {
             $data['password'] = $request->password;
         }
         $user->update($data);
+
+        // Update / buat data Guardian untuk role orang_tua
+        if ($data['role'] === 'orang_tua' && $request->filled('guardian_nama')) {
+            $guardian = Guardian::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'nama_lengkap' => $request->guardian_nama,
+                    'jk'           => $request->guardian_jk,
+                    'hubungan'     => $request->guardian_hubungan,
+                    'pekerjaan'    => $request->guardian_pekerjaan,
+                    'phone'        => $request->guardian_phone,
+                    'alamat'       => $request->guardian_alamat,
+                ]
+            );
+
+            // Update link ke siswa (anak)
+            if ($request->filled('student_id')) {
+                $guardian->students()->syncWithoutDetaching([$request->student_id => ['is_primary' => true]]);
+            }
+        }
 
         // Update mata pelajaran untuk role guru
         if ($data['role'] === 'guru' && $request->has('subject_ids')) {
