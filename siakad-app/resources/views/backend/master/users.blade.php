@@ -385,8 +385,128 @@ function editUser(id, name, email, role) {
 }
 function closeModal() { document.getElementById('userModal').classList.remove('show'); }
 
+// ─── Searchable Select ──────────────────────────────────────────────
+function initSearchableSelect(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    var input = container.querySelector('.searchable-select__input-wrap input');
+    var dropdown = container.querySelector('.searchable-select__dropdown');
+    var hidden = container.querySelector('input[type=hidden]');
+    var options = dropdown.querySelectorAll('.searchable-select__option[data-value]');
+    var activeIdx = -1;
+
+    function filterOptions(query) {
+        var q = query.toLowerCase().trim();
+        var hasResult = false;
+        options.forEach(function(opt) {
+            if (!opt.dataset.value) return; // skip placeholder
+            var match = q === '' || opt.dataset.text.indexOf(q) !== -1;
+            opt.style.display = match ? '' : 'none';
+            if (match) hasResult = true;
+        });
+        // Tampilkan/tidak placeholder
+        var placeholder = dropdown.querySelector('.searchable-select__option[data-value=""]');
+        if (placeholder) placeholder.style.display = (q === '') ? '' : 'none';
+        // No result
+        var noRes = dropdown.querySelector('.no-result');
+        if (!hasResult && q !== '') {
+            if (!noRes) {
+                noRes = document.createElement('div');
+                noRes.className = 'searchable-select__option no-result';
+                noRes.textContent = 'Tidak ditemukan';
+                dropdown.appendChild(noRes);
+            }
+            noRes.style.display = '';
+        } else if (noRes) {
+            noRes.style.display = 'none';
+        }
+        activeIdx = -1;
+    }
+
+    function openDropdown() {
+        dropdown.classList.remove('hidden');
+        container.classList.add('open');
+        filterOptions(input.value);
+    }
+
+    function closeDropdown() {
+        dropdown.classList.add('hidden');
+        container.classList.remove('open');
+    }
+
+    function selectOption(opt) {
+        input.value = opt.dataset.value ? opt.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '';
+        hidden.value = opt.dataset.value;
+        options.forEach(function(o) { o.classList.remove('selected'); });
+        if (opt.dataset.value) opt.classList.add('selected');
+        closeDropdown();
+    }
+
+    function setActive(idx) {
+        var visible = Array.from(options).filter(function(o) { return o.style.display !== 'none' && o.dataset.value; });
+        if (visible.length === 0) return;
+        activeIdx = ((idx % visible.length) + visible.length) % visible.length;
+        options.forEach(function(o) { o.classList.remove('active'); });
+        visible[activeIdx].classList.add('active');
+        visible[activeIdx].scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('focus', openDropdown);
+    input.addEventListener('input', function() {
+        openDropdown();
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(activeIdx + 1); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); setActive(activeIdx - 1); return; }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            var visible = Array.from(options).filter(function(o) { return o.style.display !== 'none' && o.dataset.value; });
+            if (activeIdx >= 0 && activeIdx < visible.length) {
+                selectOption(visible[activeIdx]);
+            } else if (visible.length === 1) {
+                selectOption(visible[0]);
+            }
+            return;
+        }
+        if (e.key === 'Escape') { closeDropdown(); input.blur(); }
+    });
+
+    dropdown.addEventListener('click', function(e) {
+        var opt = e.target.closest('.searchable-select__option');
+        if (!opt || opt.dataset.value === undefined) return;
+        if (opt.classList.contains('no-result')) return;
+        selectOption(opt);
+    });
+
+    // Close on click outside
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target)) closeDropdown();
+    });
+
+    // Expose setValue for edit mode
+    container._setValue = function(value, text) {
+        hidden.value = value || '';
+        input.value = text || '';
+        options.forEach(function(o) {
+            o.classList.remove('selected');
+            if (o.dataset.value === value) o.classList.add('selected');
+        });
+    };
+
+    // Expose reset for new modal
+    container._reset = function() {
+        hidden.value = '';
+        input.value = '';
+        options.forEach(function(o) { o.classList.remove('selected'); });
+    };
+}
+
 // Event delegation: tangkap klik dari container tabel
 document.addEventListener('DOMContentLoaded', function() {
+    // Init searchable select
+    initSearchableSelect('studentSearchSelect');
+
     document.querySelector('table').addEventListener('click', function(e) {
         var btn = e.target.closest('.js-edit-btn');
         if (!btn) return;
@@ -400,9 +520,21 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('guardianPekerjaan').value = btn.dataset.editGuardianPekerjaan || '';
             document.getElementById('guardianPhone').value = btn.dataset.editGuardianPhone || '';
             document.getElementById('guardianAlamat').value = btn.dataset.editGuardianAlamat || '';
-            document.getElementById('guardianStudentId').value = btn.dataset.editGuardianStudentId || '';
+            // Set searchable select value
+            var ss = document.getElementById('studentSearchSelect');
+            if (ss && ss._setValue) {
+                ss._setValue(btn.dataset.editGuardianStudentId || '', btn.dataset.editGuardianNama ? (btn.dataset.editGuardianNama + ' (siswa)') : '');
+            }
         }
     });
+    // Reset searchable select on modal open (via openModal override)
+    var origOpenModal = openModal;
+    openModal = function() {
+        origOpenModal();
+        var ss = document.getElementById('studentSearchSelect');
+        if (ss && ss._reset) ss._reset();
+    };
+
     // Modal click-outside-to-close
     var modal = document.getElementById('userModal');
     if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeModal(); });
