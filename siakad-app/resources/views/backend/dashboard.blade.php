@@ -49,6 +49,7 @@
     </div>
 
     {{-- Pemasukan --}}
+    @unless(in_array(auth()->user()->role, ['guru']))
     <div class="bg-white rounded-2xl p-5 border border-slate-100 hover:border-amber-100 hover:shadow-sm transition-all duration-200 group">
         <div class="flex items-start justify-between">
             <div>
@@ -61,6 +62,7 @@
             </div>
         </div>
     </div>
+    @endunless
 </div>
 
 {{-- Attendance Stats --}}
@@ -233,9 +235,11 @@
             <a href="{{ url('/backend/academic/grades') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                 <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i> Input Nilai
             </a>
+            @unless(in_array(auth()->user()->role, ['guru']))
             <a href="{{ url('/backend/finance/payments') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                 <i data-lucide="credit-card" class="w-3.5 h-3.5"></i> Pembayaran
             </a>
+            @endunless
         </div>
     </div>
 

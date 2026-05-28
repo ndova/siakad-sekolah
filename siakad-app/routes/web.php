@@ -186,6 +186,13 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
         Route::post('/exam/results/{result}/grade-answers', [ExamController::class, 'gradeAnswers'])->name('exam.results.grade-answers');
         Route::delete('/exam/results/{result}', [ExamController::class, 'deleteResult'])->name('exam.results.delete');
 
+        // ─── AI ANALITIK (shared — guru bisa akses) ────────────
+        Route::get('/ai', [\App\Http\Controllers\Backend\AiController::class, 'index'])->name('ai.dashboard');
+        Route::get('/ai/prediksi', [\App\Http\Controllers\Backend\AiController::class, 'prediksi'])->name('ai.prediksi');
+        Route::get('/ai/rekomendasi-nilai', [\App\Http\Controllers\Backend\AiController::class, 'rekomendasiNilai'])->name('ai.rekomendasi-nilai');
+        Route::post('/ai/generate-deskripsi', [\App\Http\Controllers\Backend\AiController::class, 'generateDeskripsi'])->name('ai.generate-deskripsi');
+        Route::get('/ai/search', [\App\Http\Controllers\Backend\AiController::class, 'search'])->name('ai.search');
+
         // ─── ABSENSI MANUAL (shared — guru bisa akses) ──────────
         Route::get('/attendance/siswa-manual', [AttendanceManualController::class, 'siswaForm'])->name('attendance.siswa.manual');
         Route::post('/attendance/siswa-manual', [AttendanceManualController::class, 'siswaStore'])->name('attendance.siswa.store');

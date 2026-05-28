@@ -190,6 +190,28 @@
         </main>
     </div>
 
+    {{-- Overlay Mulai Ujian (wajib klik user untuk fullscreen) --}}
+    <div id="startOverlay" class="fixed inset-0 z-50 bg-white flex items-center justify-center" style="display:none;">
+        <div class="text-center px-6 max-w-md">
+            <div class="text-6xl mb-6">📝</div>
+            <h2 class="text-xl font-bold text-slate-800 mb-3" id="startExamTitle">Ujian Siap Dimulai</h2>
+            <p class="text-sm text-slate-500 mb-2">Ujian akan berjalan dalam mode <strong>layar penuh</strong> untuk keamanan.</p>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6 text-xs text-amber-700 text-left">
+                <p class="font-semibold mb-1">⚠️ Aturan Ujian:</p>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li>Jangan keluar dari mode layar penuh</li>
+                    <li>Jangan membuka tab atau aplikasi lain</li>
+                    <li>Tombol Esc, Ctrl, Alt, Tab, dan Windows dinonaktifkan</li>
+                    <li>Pelanggaran akan menutup ujian otomatis</li>
+                </ul>
+            </div>
+            <button onclick="beginExam()" id="beginExamBtn" class="btn-accent w-full py-3.5 rounded-xl text-base font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
+                <i data-lucide="play" class="w-5 h-5"></i> Mulai Ujian
+            </button>
+            <p class="text-xs text-slate-400 mt-3">Klik tombol di atas untuk masuk mode layar penuh</p>
+        </div>
+    </div>
+
     {{-- Confirm Finish Modal --}}
     <div id="confirmModal" class="fixed inset-0 z-50 bg-black/50 items-center justify-center">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl">
@@ -218,7 +240,7 @@
         const API_BASE = '/api/v1';
         const pathParts = window.location.pathname.split('/');
         // Gunakan examId dari server jika tersedia, jika tidak parse dari URL
-        const examId = @json($examId ?? null) || pathParts[pathParts.length - 2];
+        const examId = "{{ $examId ?? '' }}" || pathParts[pathParts.length - 2];
         const currentToken = localStorage.getItem('sia_token');
 
         let examData = null;
@@ -231,6 +253,172 @@
         let remainingSeconds = 0;
         let timerInterval = null;
         let isSubmitting = false;
+        let isSecureMode = false; // mode keamanan ujian aktif
+
+        // ─── ENTER SECURE EXAM MODE ──────────────────────────
+        function enterSecureMode() {
+            // Hanya skip jika SUDAH dalam fullscreen aktif
+            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            var el = document.documentElement;
+            var promise = null;
+            if (el.requestFullscreen) {
+                promise = el.requestFullscreen();
+            } else if (el.webkitRequestFullscreen) {
+                el.webkitRequestFullscreen();
+            } else if (el.msRequestFullscreen) {
+                el.msRequestFullscreen();
+            }
+            if (promise) {
+                promise.catch(function(err) {
+                    console.warn('Fullscreen gagal:', err);
+                    alert('Gagal masuk mode layar penuh. Periksa pengaturan browser Anda. Klik OK untuk mencoba lagi.');
+                    isSecureMode = true;
+                });
+            }
+        }
+
+        function showStartOverlay() {
+            document.getElementById('startOverlay').style.display = 'flex';
+            document.getElementById('startExamTitle').textContent = examData ? 'Ujian: ' + examData.title : 'Ujian Siap Dimulai';
+            lucide.createIcons();
+        }
+
+        function beginExam() {
+            // Klik user = valid gesture untuk requestFullscreen
+            enterSecureMode();
+            // Overlay akan disembunyikan otomatis oleh onFullscreenChange saat fullscreen aktif
+            // Fallback: jika fullscreen gagal/tidak didukung, sembunyikan overlay setelah 2 detik
+            setTimeout(function() {
+                var overlay = document.getElementById('startOverlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    overlay.style.display = 'none';
+                    isSecureMode = true; // tetap aktifkan mode aman meski tanpa fullscreen
+                }
+            }, 2000);
+        }
+
+        function exitSecureMode() {
+            isSecureMode = false;
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(function(){});
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        // ─── BLOCK DANGEROUS KEYS ────────────────────────────
+        function blockKeys(e) {
+            if (!isSecureMode) return;
+            // Deteksi key secara akurat
+            var key = e.key || '';
+            var code = e.code || '';
+            // Block: Escape, Ctrl, Alt, Meta (Windows), Tab, F1-F12 (except F5)
+            var blocked = (
+                key === 'Escape' ||
+                key === 'Tab' ||
+                key === 'Control' || key === 'Alt' || key === 'Meta' ||
+                code === 'ControlLeft' || code === 'ControlRight' ||
+                code === 'AltLeft' || code === 'AltRight' ||
+                code === 'MetaLeft' || code === 'MetaRight' ||
+                code === 'OSLeft' || code === 'OSRight' ||
+                e.ctrlKey || e.altKey || e.metaKey ||
+                (e.keyCode >= 112 && e.keyCode <= 123 && e.keyCode !== 116) || // F1-F12 kecuali F5
+                (e.keyCode === 9) // Tab keycode fallback
+            );
+            if (blocked) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+            }
+            // Allow: arrow keys, F for flag, space, enter
+            return true;
+        }
+
+        function onFullscreenChange() {
+            var isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+            if (isFullscreen) {
+                // Fullscreen aktif — mode aman ON
+                isSecureMode = true;
+                document.getElementById('startOverlay').style.display = 'none';
+                var warn = document.getElementById('securityWarning');
+                if (warn && warn.parentNode) warn.parentNode.removeChild(warn);
+                if (window._secInterval) { clearInterval(window._secInterval); window._secInterval = null; }
+                var flash = document.getElementById('fsFlash');
+                if (flash && flash.parentNode) flash.parentNode.removeChild(flash);
+            } else {
+                // User keluar fullscreen (Esc/F11) — reset flag agar bisa re-enter
+                isSecureMode = false;
+                if (!isSubmitting) {
+                    showSecurityWarning();
+                }
+            }
+        }
+
+        function showSecurityWarning() {
+            // Hapus warning lama jika ada
+            var existing = document.getElementById('securityWarning');
+            if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+            if (window._secInterval) { clearInterval(window._secInterval); window._secInterval = null; }
+
+            var div = document.createElement('div');
+            div.id = 'securityWarning';
+            div.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;text-align:center;padding:20px;';
+            div.innerHTML = '<div style="font-size:64px;margin-bottom:16px;">⚠️</div>' +
+                '<h2 style="font-size:24px;font-weight:700;margin-bottom:8px;">Mode Layar Penuh Diperlukan!</h2>' +
+                '<p style="font-size:14px;margin-bottom:4px;max-width:420px;">Anda keluar dari mode layar penuh. Ujian harus dikerjakan dalam mode fullscreen.</p>' +
+                '<p style="font-size:14px;color:#f59e0b;margin-bottom:20px;">Ujian akan <strong>ditutup otomatis</strong> dalam <strong id="secCountdown" style="font-size:20px;">10</strong> detik.</p>' +
+                '<button onclick="reEnterFullscreen()" style="padding:14px 40px;background:#059669;color:white;border:none;border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(5,150,105,0.5);">🔓 Kembali ke Fullscreen</button>';
+            document.body.appendChild(div);
+
+            var seconds = 10;
+            var interval = setInterval(function() {
+                seconds--;
+                var cd = document.getElementById('secCountdown');
+                if (cd) cd.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(interval);
+                    window._secInterval = null;
+                    if (div.parentNode) div.parentNode.removeChild(div);
+                    doFinishUnsafe();
+                }
+            }, 1000);
+
+            window._secInterval = interval;
+        }
+
+        function reEnterFullscreen() {
+            var div = document.getElementById('securityWarning');
+            if (div && div.parentNode) div.parentNode.removeChild(div);
+            if (window._secInterval) { clearInterval(window._secInterval); window._secInterval = null; }
+            enterSecureMode(); // Valid karena dipicu oleh klik user
+        }
+
+        function doFinishUnsafe() {
+            // Finish without confirmation — called on security violation
+            if (isSubmitting) return;
+            isSubmitting = true;
+            clearInterval(timerInterval);
+            syncTime().then(function() {
+                apiFetch(API_BASE + '/student/exam/' + examId + '/finish', { method: 'POST' })
+                    .then(function(r) { return r?.json(); })
+                    .then(function(data) {
+                        exitSecureMode();
+                        var rm = document.getElementById('resultModal');
+                        if (rm) {
+                            rm.style.display = 'flex';
+                            document.getElementById('resultScore').innerHTML = '<p style="font-size:16px;color:#64748b;margin:20px;">Ujian telah ditutup karena pelanggaran keamanan.</p>';
+                        }
+                    })
+                    .catch(function() {
+                        window.location.href = '/portal/siswa/exams';
+                    });
+            });
+        }
 
         async function apiFetch(url, opts = {}) {
             const headers = {
@@ -311,6 +499,9 @@
                 showQuestion(0);
                 startTimer();
                 updateAnswerInfo();
+
+                // Tampilkan overlay "Mulai Ujian" — wajib klik untuk fullscreen
+                showStartOverlay();
 
                 lucide.createIcons();
             } catch (e) {
@@ -835,6 +1026,7 @@
                 if (!data.success) throw new Error(data.message);
 
                 clearInterval(timerInterval);
+                exitSecureMode(); // Matikan mode keamanan
 
                 // Show result
                 const rd = data.data;
@@ -885,8 +1077,21 @@
             }
         });
 
+        // ─── Fullscreen Change & Security ──────────────────────
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+        document.addEventListener('msfullscreenchange', onFullscreenChange);
+
+        // ─── Block unwanted keys during exam ─────────────────
+        document.addEventListener('keydown', blockKeys, true);
+        document.addEventListener('keyup', blockKeys, true);
+        window.addEventListener('keydown', blockKeys, true);
+        window.addEventListener('keyup', blockKeys, true);
+        document.addEventListener('contextmenu', function(e) { if (isSecureMode) e.preventDefault(); });
+
         // ─── Keyboard Navigation ────────────────────────────────
         document.addEventListener('keydown', function(e) {
+            if (!isSecureMode) return;
             if (e.key === 'ArrowLeft') navigateQuestion(-1);
             else if (e.key === 'ArrowRight') navigateQuestion(1);
             else if (e.key === 'f' && !e.ctrlKey && !e.metaKey) toggleFlag();

@@ -245,7 +245,13 @@
         .focus\:border-accent-400:focus { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
         .peer-checked\:ring-accent-500:checked ~ .peer-checked\:ring-accent-500 { --tw-ring-color: color-mix(in srgb, var(--accent) 70%, transparent); }
         .shadow-accent-200\/50 { box-shadow: 0 4px 6px -1px color-mix(in srgb, var(--accent) 30%, transparent); }
+        /* Modal overlay global */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal-overlay.show { display: flex !important; }
+        .modal-box { background: white; border-radius: 16px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
     </style>
+    @push('styles')
+    @endpush
     @stack('styles')
 </head>
 <body class="min-h-screen flex">
@@ -344,6 +350,18 @@
                 </a>
                 <a href="{{ url('/backend/exam/results') }}" class="sidebar-link {{ request()->is('backend/exam/results*') ? 'active' : '' }}">
                     <i data-lucide="check-circle-2"></i> Hasil
+                </a>
+
+                {{-- AI Analitik --}}
+                <div class="sidebar-section">AI Analitik</div>
+                <a href="{{ url('/backend/ai') }}" class="sidebar-link {{ request()->is('backend/ai') ? 'active' : '' }}">
+                    <i data-lucide="sparkles"></i> Dashboard AI
+                </a>
+                <a href="{{ url('/backend/ai/prediksi') }}" class="sidebar-link {{ request()->is('backend/ai/prediksi*') ? 'active' : '' }}">
+                    <i data-lucide="brain-circuit"></i> Prediksi Siswa
+                </a>
+                <a href="#" onclick="toggleAiSearch(); return false;" class="sidebar-link" id="aiSearchLink">
+                    <i data-lucide="search"></i> Cari Cerdas
                 </a>
 
                 {{-- Keuangan --}}
@@ -647,7 +665,74 @@
 
         // ─── Lucide ──────────────────────────────────────────────
         try { if (typeof lucide !== 'undefined') lucide.createIcons(); } catch(e) {}
+
+        // ─── AI Search Popup ───────────────────────────────────
+        function toggleAiSearch() {
+            var modal = document.getElementById('aiSearchModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            setTimeout(function() { document.getElementById('aiSearchInput').focus(); }, 200);
+        }
+        function closeAiSearch() { document.getElementById('aiSearchModal').classList.remove('show'); }
+        function aiSearchQuery(q) {
+            if (q.length < 2) {
+                document.getElementById('aiSearchResults').innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Ketik minimal 2 karakter...</p>';
+                return;
+            }
+            document.getElementById('aiSearchResults').innerHTML = '<p class="text-sm text-slate-400 text-center py-4">🔍 Mencari...</p>';
+            fetch('{{ url("/backend/ai/search") }}?q=' + encodeURIComponent(q), {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                var container = document.getElementById('aiSearchResults');
+                if (!res.success || !res.results || res.results.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">Tidak ditemukan hasil untuk "' + res.query + '"</p>';
+                    return;
+                }
+                var html = '<div class="text-xs text-slate-400 px-4 py-2">Ditemukan ' + res.total + ' hasil</div>';
+                res.results.forEach(function(r) {
+                    var icon = r.icon || 'search';
+                    var typeClass = r.type === 'siswa' ? 'bg-blue-50 text-blue-600' :
+                        r.type === 'guru' ? 'bg-emerald-50 text-emerald-600' :
+                        r.type === 'mapel' ? 'bg-violet-50 text-violet-600' : 'bg-amber-50 text-amber-600';
+                    html += '<a href="' + r.link + '" class="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition border-b border-slate-50">' +
+                        '<div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ' + typeClass + '"><i data-lucide="' + icon + '" class="w-4 h-4"></i></div>' +
+                        '<div class="flex-1 min-w-0">' +
+                            '<div class="font-medium text-sm text-slate-800">' + r.title + '</div>' +
+                            '<div class="text-xs text-slate-400">' + r.subtitle + '</div>' +
+                            (r.detail ? '<div class="text-xs text-slate-500 mt-0.5">' + r.detail + '</div>' : '') +
+                        '</div>' +
+                    '</a>';
+                });
+                container.innerHTML = html;
+                try { if (typeof lucide !== 'undefined') lucide.createIcons(); } catch(e) {}
+            })
+            .catch(function() {
+                document.getElementById('aiSearchResults').innerHTML = '<p class="text-sm text-red-500 text-center py-4">Gagal mencari. Coba lagi.</p>';
+            });
+        }
     </script>
+    {{-- AI Search Modal --}}
+    <div class="modal-overlay" id="aiSearchModal" style="display:none; align-items:flex-start; padding-top:80px;">
+        <div class="modal-box" style="max-width:520px;">
+            <div class="p-4 border-b border-slate-100 flex items-center gap-3">
+                <i data-lucide="sparkles" class="w-5 h-5 text-violet-500"></i>
+                <input type="text" id="aiSearchInput" placeholder="Cari siswa, guru, mapel, kelas..." autocomplete="off"
+                    oninput="aiSearchQuery(this.value)"
+                    class="flex-1 text-sm focus:outline-none bg-transparent">
+                <button onclick="closeAiSearch()" class="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="aiSearchResults" class="max-h-80 overflow-y-auto">
+                <p class="text-sm text-slate-400 text-center py-6">
+                    <i data-lucide="search" class="w-5 h-5 mx-auto mb-2 text-slate-300"></i>
+                    Ketik untuk mencari di seluruh data sekolah
+                </p>
+            </div>
+        </div>
+    </div>
     @stack('scripts')
 </body>
 </html>

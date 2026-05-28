@@ -51,6 +51,14 @@
 </form>
 
 @if($classSubjectId)
+{{-- AI Insight: Statistik Kelas --}}
+<div id="aiGradeInsight" class="mb-4 hidden">
+    <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100 text-sm text-slate-600">
+        <i data-lucide="sparkles" class="w-4 h-4 text-violet-500 animate-pulse"></i>
+        <span id="aiGradeText" class="text-slate-600">Memuat data analitik...</span>
+    </div>
+</div>
+
 {{-- Grade Input Table --}}
 <form method="POST" action="{{ route('academic.grades.bulk') }}" id="gradeForm">
 @csrf
@@ -234,6 +242,32 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+// ─── AI Grade Insight ───────────────────────────────────────
+(function() {
+    var csId = {{ $classSubjectId ?: 'null' }};
+    if (!csId) return;
+    var container = document.getElementById('aiGradeInsight');
+    var textEl = document.getElementById('aiGradeText');
+    if (!container || !textEl) return;
+    container.classList.remove('hidden');
+    fetch('{{ route("ai.rekomendasi-nilai") }}?class_subject_id=' + csId, {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            var msg = '📊 Rata-rata kelas: <strong>' + res.rata_kelas + '</strong> | ';
+            msg += 'Tertinggi: <strong>' + res.tertinggi + '</strong> | ';
+            msg += 'Terendah: <strong>' + res.terendah + '</strong> | ';
+            msg += 'Total nilai: <strong>' + res.total + '</strong>';
+            textEl.innerHTML = msg;
+        } else {
+            container.classList.add('hidden');
+        }
+    })
+    .catch(function() { container.classList.add('hidden'); });
+})();
 
 // ─── Auto-refresh icon setelah load ─────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
