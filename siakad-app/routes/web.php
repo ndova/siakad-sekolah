@@ -79,6 +79,7 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
 
                 // Students
                 Route::get('/students', [MasterController::class, 'students'])->name('master.students');
+                Route::get('/students/{student}', [MasterController::class, 'showStudent'])->name('master.students.show');
                 Route::post('/students', [MasterController::class, 'storeStudent'])->name('master.students.store');
                 Route::put('/students/{student}', [MasterController::class, 'updateStudent'])->name('master.students.update');
                 Route::post('/students/{student}/delete', [MasterController::class, 'deleteStudent'])->name('master.students.delete');

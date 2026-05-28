@@ -280,7 +280,7 @@ class MasterController extends Controller
     {
         $perPage = $this->perPage($request);
         $user = auth()->user();
-        $query = Student::with(['class', 'user'])
+        $query = Student::with(['class', 'user', 'parents'])
             ->where('school_id', $this->schoolId());
 
         // Guru hanya lihat siswa di kelas yang dia ampu
@@ -385,6 +385,60 @@ class MasterController extends Controller
     {
         $student->update(['status' => 'keluar']);
         return back()->with('success', 'Siswa dikeluarkan.');
+    }
+
+    public function showStudent(Student $student)
+    {
+        // Pastikan siswa dari sekolah yang sama
+        if ($student->school_id !== $this->schoolId()) {
+            abort(404);
+        }
+
+        $student->load([
+            'class:id,code,tingkat,wali_kelas_id',
+            'class.waliKelas:id,name,phone',
+            'user:id,name,email,phone,photo',
+            'parents:id,nama_lengkap,hubungan,phone',
+        ]);
+
+        // Ambil wali utama & daftar wali
+        $primaryParent = $student->parents->firstWhere('pivot.is_primary', true);
+        $waliList = $student->parents->map(fn($p) => [
+            'nama'     => $p->nama_lengkap,
+            'hubungan' => $p->hubungan,
+            'phone'    => $p->phone,
+            'is_primary' => (bool) ($p->pivot->is_primary ?? false),
+        ])->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id'             => $student->id,
+                'nama_lengkap'   => $student->nama_lengkap,
+                'nis'            => $student->nis,
+                'nisn'           => $student->nisn,
+                'nik'            => $student->nik,
+                'kode_dapodik'   => $student->kode_dapodik,
+                'jk'             => $student->jk,
+                'tempat_lahir'   => $student->tempat_lahir,
+                'tanggal_lahir'  => $student->tanggal_lahir?->format('d M Y'),
+                'agama'          => $student->agama,
+                'alamat'         => $student->alamat,
+                'phone'          => $student->phone,
+                'nama_ayah'      => $student->nama_ayah,
+                'nama_ibu'       => $student->nama_ibu,
+                'nama_wali'      => $primaryParent?->nama_lengkap ?? $student->nama_ayah ?? $student->nama_ibu,
+                'wali_list'      => $waliList,
+                'status'         => $student->status,
+                'tanggal_masuk'  => $student->tanggal_masuk?->format('d M Y'),
+                'kelas'          => $student->class?->code,
+                'tingkat'        => $student->class?->tingkat,
+                'wali_kelas'     => $student->class?->waliKelas?->name,
+                'email'          => $student->user?->email,
+                'phone_akun'     => $student->user?->phone,
+                'photo'          => $student->user?->photo ? asset('storage/'.$student->user->photo) : null,
+            ],
+        ]);
     }
 
     // ─── TEACHERS (GTK) ────────────────────────────────────────────────
