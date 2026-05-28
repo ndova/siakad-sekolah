@@ -193,8 +193,11 @@
 </div>
 @endsection
 
-@push('scripts')
+@push('styles')
 <style>
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.show { display: flex; }
+.modal-box { background: white; border-radius: 16px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
 .searchable-select { position: relative; }
 .searchable-select__input-wrap { position: relative; }
 .searchable-select__input-wrap input { padding-right: 2rem; }
@@ -210,6 +213,9 @@
 .searchable-select__option.no-result { color: #94a3b8; cursor: default; text-align: center; }
 .searchable-select__option.no-result:hover { background: transparent; }
 </style>
+@endpush
+
+@push('scripts')
 <script>
 function openModal() {
     document.getElementById('modalTitle').textContent = 'Tambah Orang Tua/Wali';
