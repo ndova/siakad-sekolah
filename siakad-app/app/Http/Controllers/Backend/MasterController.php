@@ -166,8 +166,7 @@ class MasterController extends Controller
     public function classes(Request $request)
     {
         $user = auth()->user();
-        $query = SchoolClass::with(['waliKelas', 'major', 'academicYear'])
-            ->where('school_id', $this->schoolId());
+        $query = SchoolClass::with(['waliKelas', 'major', 'academicYear'])            ->withCount('students')            ->where('school_id', $this->schoolId());
 
         // Guru hanya lihat kelas yang dia ampu
         if ($user->role === 'guru') {
@@ -194,8 +193,8 @@ class MasterController extends Controller
             'jenjang'=> 'required|in:SMP,SMA,SMK',
             'major_id' => 'nullable|exists:majors,id',
             'wali_kelas_id' => 'nullable|exists:users,id',
+            'kapasitas' => 'nullable|integer|min:1',
         ]);
-        $data['school_id'] = $this->schoolId();
         $data['is_active'] = true;
         SchoolClass::create($data);
         return back()->with('success', 'Rombel berhasil ditambahkan.');
@@ -204,13 +203,17 @@ class MasterController extends Controller
     public function updateClass(Request $request, SchoolClass $class)
     {
         $data = $request->validate([
+            'academic_year_id' => 'required|exists:academic_years,id',
             'code'   => 'required|string|max:20',
-            'tingkat'=> 'required|integer|min:1|max:12',
+            'tingkat'=> 'nullable|integer|min:1|max:12',
+            'jenjang'=> 'nullable|in:SMP,SMA,SMK',
             'wali_kelas_id' => 'nullable|exists:users,id',
             'major_id' => 'nullable|exists:majors,id',
+            'kapasitas' => 'nullable|integer|min:1',
             'is_active' => 'boolean',
         ]);
-        $class->update($data);
+        // Hanya update field yang tidak null/empty (jaga NOT NULL constraint)
+        $class->update(array_filter($data, fn($v) => $v !== null && $v !== ''));
         return back()->with('success', 'Rombel diperbarui.');
     }
 
@@ -550,6 +553,8 @@ class MasterController extends Controller
     public function updateClassSubject(Request $request, \App\Models\ClassSubject $mapping)
     {
         $data = $request->validate([
+            'class_id'   => 'required|exists:classes,id',
+            'subject_id' => 'required|exists:subjects,id',
             'semester_id'=> 'nullable|exists:semesters,id',
             'teacher_id' => 'required|exists:users,id',
             'kkm'        => 'nullable|numeric|min:0|max:100',

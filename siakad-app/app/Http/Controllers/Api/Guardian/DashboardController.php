@@ -60,7 +60,7 @@ class DashboardController extends Controller
             $upcomingExams = Exam::where(function ($q) {
                 $q->where('status', 'published')->orWhere('status', 'ongoing');
             })
-                ->whereJsonContains('class_ids', $student->class_id)
+                ->where('class_ids', 'LIKE', '%'.$student->class_id.'%')
                 ->count();
 
             return [

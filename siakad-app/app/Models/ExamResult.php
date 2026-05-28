@@ -12,7 +12,19 @@ class ExamResult extends Model
 {
     use HasFactory, HasUuids;
     protected $fillable = ['exam_session_id','student_id','exam_id','total_score','correct_count','wrong_count','tp_scores','is_passed','graded_by','graded_at'];
-    protected function casts(): array { return ['tp_scores'=>'array','is_passed'=>'boolean','graded_at'=>'datetime']; }
+    protected function casts(): array { return ['is_passed'=>'boolean','graded_at'=>'datetime']; }
+
+    protected function getTpScoresAttribute(): array
+    {
+        $raw = $this->attributes['tp_scores'] ?? null;
+        if (empty($raw)) return [];
+        if (is_array($raw)) return $raw;
+        $decoded = json_decode($raw, true);
+        if (is_string($decoded)) {
+            $decoded = json_decode($decoded, true);
+        }
+        return is_array($decoded) ? $decoded : [];
+    }
     public function examSession(): BelongsTo { return $this->belongsTo(ExamSession::class); }
     public function student(): BelongsTo { return $this->belongsTo(Student::class); }
     public function exam(): BelongsTo { return $this->belongsTo(Exam::class); }

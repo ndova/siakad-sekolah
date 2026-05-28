@@ -18,15 +18,26 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => 'required|email',
+            'identifier' => 'required|string|max:200',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $identifier = $request->identifier;
+
+        // Coba login via email dulu
+        $user = User::where('email', $identifier)->first();
+
+        // Jika tidak ditemukan, coba login via NIS (untuk role siswa)
+        if (!$user) {
+            $student = Student::where('nis', $identifier)->first();
+            if ($student) {
+                $user = $student->user;
+            }
+        }
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['Email atau password salah.'],
+                'identifier' => ['Email/NIS atau password salah.'],
             ]);
         }
 

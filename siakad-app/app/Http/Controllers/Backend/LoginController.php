@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Enums\Role;
 use App\Enums\CurriculumType;
 use App\Http\Controllers\Controller;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,11 +27,22 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email'    => 'required|email',
+            'email'    => 'required|string|max:200',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        $identifier = $credentials['email'];
+
+        // Coba login via email dulu
+        $user = User::where('email', $identifier)->first();
+
+        // Jika tidak ditemukan, coba login via NIS
+        if (!$user) {
+            $student = Student::where('nis', $identifier)->first();
+            if ($student) {
+                $user = $student->user;
+            }
+        }
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             // Jika request AJAX/JSON (dari JS fetch)

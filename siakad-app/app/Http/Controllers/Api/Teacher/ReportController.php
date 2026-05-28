@@ -84,7 +84,7 @@ class ReportController extends Controller
 
         // Ambil P5
         $p5Projects = P5Project::where('semester_id', $semester->id)
-            ->whereJsonContains('class_ids', $homeroomClass->id)
+            ->where('class_ids', 'LIKE', '%'.$homeroomClass->id.'%')
             ->get();
 
         $p5Assessments = P5Assessment::whereIn('p5_project_id', $p5Projects->pluck('id'))

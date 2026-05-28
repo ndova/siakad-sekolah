@@ -47,11 +47,13 @@ class ExamController extends Controller
                 'semester' => $e->semester?->semester_number,
                 'total_questions' => $e->total_questions,
                 'total_score' => $e->total_score,
+                'minimum_score' => $e->minimum_score,
                 'duration' => $e->duration,
                 'start_time' => $e->start_time?->toISOString(),
                 'end_time' => $e->end_time?->toISOString(),
                 'status' => $e->status,
                 'class_ids' => $e->class_ids,
+                'class_codes' => $e->class_codes,
                 'created_at' => $e->created_at?->toISOString(),
             ]),
             'meta' => [
@@ -70,7 +72,7 @@ class ExamController extends Controller
         $user = $request->user();
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => ['required', 'in:uh,sts,sas,asaj,tryout'],
+            'type' => ['required', 'in:uh,sts,sas,asaj,tryout,remedi'],
             'subject_id' => 'required|exists:subjects,id',
             'class_ids' => 'required|array|min:1',
             'class_ids.*' => 'exists:classes,id',
@@ -82,6 +84,7 @@ class ExamController extends Controller
             'random_answers' => 'boolean',
             'show_result' => 'boolean',
             'max_devices' => 'nullable|integer|min:1|max:10',
+            'minimum_score' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $activeSemester = Semester::where('is_active', true)->first();
@@ -104,6 +107,7 @@ class ExamController extends Controller
             'random_answers' => $validated['random_answers'] ?? false,
             'show_result' => $validated['show_result'] ?? false,
             'max_devices' => $validated['max_devices'] ?? 1,
+            'minimum_score' => $validated['minimum_score'] ?? null,
             'status' => 'draft',
             'created_by' => $user->id,
         ]);
@@ -158,11 +162,13 @@ class ExamController extends Controller
                 'subject' => $exam->subject?->name,
                 'semester' => $exam->semester?->semester_number,
                 'class_ids' => $exam->class_ids,
+                'class_codes' => $exam->class_codes,
                 'start_time' => $exam->start_time?->toISOString(),
                 'end_time' => $exam->end_time?->toISOString(),
                 'duration' => $exam->duration,
                 'total_questions' => $exam->total_questions,
                 'total_score' => $exam->total_score,
+                'minimum_score' => $exam->minimum_score,
                 'status' => $exam->status,
                 'random_questions' => $exam->random_questions,
                 'random_answers' => $exam->random_answers,
@@ -180,7 +186,7 @@ class ExamController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => ['required', 'in:uh,sts,sas,asaj,tryout'],
+            'type' => ['required', 'in:uh,sts,sas,asaj,tryout,remedi'],
             'subject_id' => 'required|exists:subjects,id',
             'class_ids' => 'required|array|min:1',
             'class_ids.*' => 'exists:classes,id',
@@ -193,6 +199,7 @@ class ExamController extends Controller
             'random_answers' => 'boolean',
             'show_result' => 'boolean',
             'max_devices' => 'nullable|integer|min:1|max:10',
+            'minimum_score' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $exam->update($validated);
@@ -312,6 +319,7 @@ class ExamController extends Controller
                 'id' => $exam->id,
                 'title' => $exam->title,
                 'total_score' => $exam->total_score,
+                'minimum_score' => $exam->minimum_score,
             ],
             'stats' => $stats,
             'data' => $results,
@@ -351,6 +359,25 @@ class ExamController extends Controller
             'success' => true,
             'message' => 'Hasil ujian berhasil dikoreksi',
             'data' => $result->fresh(),
+        ]);
+    }
+
+    /**
+     * Hapus hasil ujian beserta sesi dan jawaban.
+     */
+    public function destroyResult(Request $request, ExamResult $result): JsonResponse
+    {
+        // Hapus sesi ujian (cascade delete answers)
+        if ($result->examSession) {
+            $result->examSession->answers()->delete();
+            $result->examSession->delete();
+        }
+
+        $result->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Hasil ujian berhasil dihapus.',
         ]);
     }
 }
