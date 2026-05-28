@@ -84,6 +84,12 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
                 Route::put('/students/{student}', [MasterController::class, 'updateStudent'])->name('master.students.update');
                 Route::post('/students/{student}/delete', [MasterController::class, 'deleteStudent'])->name('master.students.delete');
 
+                // Guardians (Orang Tua / Wali)
+                Route::get('/guardians', [MasterController::class, 'guardians'])->name('master.guardians');
+                Route::post('/guardians', [MasterController::class, 'storeGuardian'])->name('master.guardians.store');
+                Route::put('/guardians/{guardian}', [MasterController::class, 'updateGuardian'])->name('master.guardians.update');
+                Route::post('/guardians/{guardian}/delete', [MasterController::class, 'deleteGuardian'])->name('master.guardians.delete');
+
                 // Academic Setup
                 Route::get('/academic-setup', [MasterController::class, 'academicSetup'])->name('master.academic-setup');
                 Route::post('/academic-years', [MasterController::class, 'storeAcademicYear'])->name('master.academic-years.store');

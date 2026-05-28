@@ -20,6 +20,7 @@
     .searchable-select__option:hover,
     .searchable-select__option.active { background: #f1f5f9; }
     .searchable-select__option.selected { background: #eff6ff; color: #2563eb; font-weight: 500; }
+    .searchable-select__option.selected:hover { background: #eff6ff; cursor: default; }
     .searchable-select__option.no-result { color: #94a3b8; cursor: default; text-align: center; }
     .searchable-select__option.no-result:hover { background: transparent; }
 </style>
@@ -111,7 +112,7 @@
                 </td>
                 <td class="px-5 py-3.5">
                     <div class="flex gap-1">
-                        <button data-edit-id="{{ $user->id }}" data-edit-name="{{ $user->name }}" data-edit-email="{{ $user->email }}" data-edit-role="{{ $user->role }}" data-edit-guardian-nama="{{ $user->guardian?->nama_lengkap }}" data-edit-guardian-jk="{{ $user->guardian?->jk }}" data-edit-guardian-hubungan="{{ $user->guardian?->hubungan }}" data-edit-guardian-pekerjaan="{{ $user->guardian?->pekerjaan }}" data-edit-guardian-phone="{{ $user->guardian?->phone }}" data-edit-guardian-alamat="{{ $user->guardian?->alamat }}" data-edit-guardian-student-id="{{ $user->guardian?->students?->first()?->id }}" class="p-1.5 rounded-lg hover:bg-accent-50 text-slate-400 hover:text-accent transition js-edit-btn" title="Edit">
+                        <button data-edit-id="{{ $user->id }}" data-edit-name="{{ $user->name }}" data-edit-email="{{ $user->email }}" data-edit-role="{{ $user->role }}" data-edit-guardian-nama="{{ $user->guardian?->nama_lengkap }}" data-edit-guardian-jk="{{ $user->guardian?->jk }}" data-edit-guardian-hubungan="{{ $user->guardian?->hubungan }}" data-edit-guardian-pekerjaan="{{ $user->guardian?->pekerjaan }}" data-edit-guardian-phone="{{ $user->guardian?->phone }}" data-edit-guardian-alamat="{{ $user->guardian?->alamat }}" data-edit-guardian-student-id="{{ $user->guardian?->students?->first()?->id }}" data-edit-guardian-student-name="{{ $user->guardian?->students?->first()?->nama_lengkap }}" class="p-1.5 rounded-lg hover:bg-accent-50 text-slate-400 hover:text-accent transition js-edit-btn" title="Edit">
                             <i data-lucide="pencil" class="w-4 h-4"></i>
                         </button>
                         <form method="POST" action="{{ route('master.users.delete', $user->id) }}" onsubmit="event.preventDefault(); showConfirm('Hapus permanen user ini?', 'Hapus User', 'Ya, Hapus', () => this.submit());" class="inline">
@@ -395,14 +396,21 @@ function initSearchableSelect(containerId) {
     var options = dropdown.querySelectorAll('.searchable-select__option[data-value]');
     var activeIdx = -1;
 
-    function filterOptions(query) {
+    function filterOptions(query, hideSelected) {
         var q = query.toLowerCase().trim();
         var hasResult = false;
+        var selectedValue = hidden.value;
         options.forEach(function(opt) {
             if (!opt.dataset.value) return; // skip placeholder
+            var isSelected = opt.classList.contains('selected');
             var match = q === '' || opt.dataset.text.indexOf(q) !== -1;
-            opt.style.display = match ? '' : 'none';
-            if (match) hasResult = true;
+            // Hide jika sudah selected dan masih di opsi yang sama
+            if (hideSelected && isSelected && opt.dataset.value !== selectedValue) {
+                opt.style.display = 'none';
+            } else {
+                opt.style.display = match ? '' : 'none';
+                if (match) hasResult = true;
+            }
         });
         // Tampilkan/tidak placeholder
         var placeholder = dropdown.querySelector('.searchable-select__option[data-value=""]');
@@ -426,7 +434,7 @@ function initSearchableSelect(containerId) {
     function openDropdown() {
         dropdown.classList.remove('hidden');
         container.classList.add('open');
-        filterOptions(input.value);
+        filterOptions(input.value, true);
     }
 
     function closeDropdown() {
@@ -435,11 +443,17 @@ function initSearchableSelect(containerId) {
     }
 
     function selectOption(opt) {
+        if (opt.classList.contains('selected')) {
+            closeDropdown();
+            return;
+        }
         input.value = opt.dataset.value ? opt.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '';
         hidden.value = opt.dataset.value;
         options.forEach(function(o) { o.classList.remove('selected'); });
         if (opt.dataset.value) opt.classList.add('selected');
         closeDropdown();
+        // Refresh icon
+        try { if (typeof lucide !== 'undefined') lucide.createIcons(); } catch(e) {}
     }
 
     function setActive(idx) {
@@ -523,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set searchable select value
             var ss = document.getElementById('studentSearchSelect');
             if (ss && ss._setValue) {
-                ss._setValue(btn.dataset.editGuardianStudentId || '', btn.dataset.editGuardianNama ? (btn.dataset.editGuardianNama + ' (siswa)') : '');
+                ss._setValue(btn.dataset.editGuardianStudentId || '', btn.dataset.editGuardianStudentName || '');
             }
         }
     });

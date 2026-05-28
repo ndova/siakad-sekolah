@@ -287,6 +287,9 @@
                     <i data-lucide="briefcase"></i> Guru
                 </a>
                 @endunless
+                <a href="{{ url('/backend/master/guardians') }}" class="sidebar-link {{ request()->is('backend/master/guardians*') ? 'active' : '' }}">
+                    <i data-lucide="user-check"></i> Orang Tua/Wali
+                </a>
                 <a href="{{ url('/backend/master/classes') }}" class="sidebar-link {{ request()->is('backend/master/classes*') ? 'active' : '' }}">
                     <i data-lucide="school"></i> Kelas
                 </a>

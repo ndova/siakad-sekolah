@@ -108,8 +108,8 @@ class MasterController extends Controller
             $guardian = Guardian::create([
                 'user_id'      => $user->id,
                 'nama_lengkap' => $request->guardian_nama,
-                'jk'           => $request->guardian_jk,
-                'hubungan'     => $request->guardian_hubungan,
+                'jk'           => $request->guardian_jk ?? 'L',
+                'hubungan'     => $request->guardian_hubungan ?: 'Wali',
                 'pekerjaan'    => $request->guardian_pekerjaan,
                 'phone'        => $request->guardian_phone,
                 'alamat'       => $request->guardian_alamat,
@@ -118,7 +118,16 @@ class MasterController extends Controller
             // Link ke siswa (anak) jika dipilih
             if ($request->filled('student_id')) {
                 $student = Student::findOrFail($request->student_id);
-                $guardian->students()->attach($student->id, ['is_primary' => true]);
+                $alreadyLinked = \App\Models\ParentStudent::where('student_id', $student->id)
+                    ->where('parent_id', '!=', $guardian->id)
+                    ->exists();
+                if ($alreadyLinked) {
+                    return back()->with('error', 'Siswa ' . $student->nama_lengkap . ' sudah terdaftar sebagai anak dari wali lain.');
+                }
+                $guardian->students()->attach($student->id, [
+                    'is_primary' => true,
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                ]);
             }
         }
 
@@ -167,21 +176,36 @@ class MasterController extends Controller
 
         // Update / buat data Guardian untuk role orang_tua
         if ($data['role'] === 'orang_tua' && $request->filled('guardian_nama')) {
+            // Pastikan field wajib terisi (required di DB: hubungan)
+            $guardianData = [
+                'nama_lengkap' => $request->guardian_nama,
+                'jk'           => $request->guardian_jk ?? 'L',
+                'hubungan'     => $request->guardian_hubungan ?: 'Wali',
+                'pekerjaan'    => $request->guardian_pekerjaan,
+                'phone'        => $request->guardian_phone,
+                'alamat'       => $request->guardian_alamat,
+            ];
             $guardian = Guardian::updateOrCreate(
                 ['user_id' => $user->id],
-                [
-                    'nama_lengkap' => $request->guardian_nama,
-                    'jk'           => $request->guardian_jk,
-                    'hubungan'     => $request->guardian_hubungan,
-                    'pekerjaan'    => $request->guardian_pekerjaan,
-                    'phone'        => $request->guardian_phone,
-                    'alamat'       => $request->guardian_alamat,
-                ]
+                $guardianData
             );
 
             // Update link ke siswa (anak)
             if ($request->filled('student_id')) {
-                $guardian->students()->syncWithoutDetaching([$request->student_id => ['is_primary' => true]]);
+                $alreadyLinkedToOther = \App\Models\ParentStudent::where('student_id', $request->student_id)
+                    ->where('parent_id', '!=', $guardian->id)
+                    ->exists();
+                if ($alreadyLinkedToOther) {
+                    $student = Student::find($request->student_id);
+                    return back()->with('error', 'Siswa ' . ($student?->nama_lengkap ?? $request->student_id) . ' sudah terdaftar sebagai anak dari wali lain.');
+                }
+                $exists = $guardian->students()->where('student_id', $request->student_id)->exists();
+                if (!$exists) {
+                    $guardian->students()->attach($request->student_id, [
+                        'is_primary' => true,
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                    ]);
+                }
             }
         }
 
@@ -511,6 +535,134 @@ class MasterController extends Controller
             ->orderBy('name')->paginate($perPage)->withQueryString();
         $classes = SchoolClass::where('school_id', $this->schoolId())->where('is_active',true)->get();
         return view('backend.master.teachers', compact('teachers','classes', 'perPage'));
+    }
+
+    // ─── GUARDIANS (ORANG TUA / WALI) ─────────────────────────────────
+    public function guardians(Request $request)
+    {
+        $perPage = $this->perPage($request);
+        $guardians = Guardian::with(['students', 'user'])
+            ->whereHas('user', fn($q) => $q->where('school_id', $this->schoolId()))
+            ->when($request->search, fn($q, $s) => $q->where('nama_lengkap', 'like', "%$s%"))
+            ->when($request->hubungan, fn($q, $h) => $q->where('hubungan', $h))
+            ->orderBy('nama_lengkap')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $students = Student::where('school_id', $this->schoolId())
+            ->where('status', 'aktif')
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        return view('backend.master.guardians', compact('guardians', 'students', 'perPage'));
+    }
+
+    public function storeGuardian(Request $request)
+    {
+        $data = $request->validate([
+            'guardian_nama'      => 'required|string|max:200',
+            'guardian_jk'        => 'required|in:L,P',
+            'guardian_hubungan'  => 'required|string|max:50',
+            'guardian_pekerjaan' => 'nullable|string|max:100',
+            'guardian_phone'     => 'nullable|string|max:20',
+            'guardian_alamat'    => 'nullable|string',
+            'student_id'         => 'nullable|exists:students,id',
+            'email'              => 'nullable|email|unique:users,email',
+            'password'           => 'nullable|min:6',
+        ]);
+
+        $user = null;
+        if ($request->filled('email')) {
+            $user = User::create([
+                'name'       => $request->guardian_nama,
+                'email'      => $request->email,
+                'password'   => $request->password ?? 'orangtua123',
+                'role'       => 'orang_tua',
+                'school_id'  => $this->schoolId(),
+                'is_active'  => true,
+            ]);
+        }
+
+        $guardian = Guardian::create([
+            'user_id'      => $user?->id,
+            'nama_lengkap' => $request->guardian_nama,
+            'jk'           => $request->guardian_jk,
+            'hubungan'     => $request->guardian_hubungan,
+            'pekerjaan'    => $request->guardian_pekerjaan,
+            'phone'        => $request->guardian_phone,
+            'alamat'       => $request->guardian_alamat,
+        ]);
+
+        if ($request->filled('student_id')) {
+            $exists = \App\Models\ParentStudent::where('student_id', $request->student_id)->exists();
+            if ($exists) {
+                $siswa = Student::find($request->student_id);
+                return back()->with('error', 'Siswa ' . ($siswa?->nama_lengkap ?? '') . ' sudah terdaftar ke wali lain.')->withInput();
+            }
+            $guardian->students()->attach($request->student_id, [
+                'is_primary' => true,
+                'id'         => (string) \Illuminate\Support\Str::uuid(),
+            ]);
+        }
+
+        return back()->with('success', 'Data orang tua/wali berhasil ditambahkan.');
+    }
+
+    public function updateGuardian(Request $request, Guardian $guardian)
+    {
+        $data = $request->validate([
+            'guardian_nama'      => 'required|string|max:200',
+            'guardian_jk'        => 'required|in:L,P',
+            'guardian_hubungan'  => 'required|string|max:50',
+            'guardian_pekerjaan' => 'nullable|string|max:100',
+            'guardian_phone'     => 'nullable|string|max:20',
+            'guardian_alamat'    => 'nullable|string',
+            'student_id'         => 'nullable|exists:students,id',
+        ]);
+
+        $guardian->update([
+            'nama_lengkap' => $request->guardian_nama,
+            'jk'           => $request->guardian_jk,
+            'hubungan'     => $request->guardian_hubungan,
+            'pekerjaan'    => $request->guardian_pekerjaan,
+            'phone'        => $request->guardian_phone,
+            'alamat'       => $request->guardian_alamat,
+        ]);
+
+        // Sync akun user jika ada
+        if ($guardian->user) {
+            $guardian->user->update(['name' => $request->guardian_nama]);
+        }
+
+        // Link ke siswa
+        if ($request->filled('student_id')) {
+            $already = \App\Models\ParentStudent::where('student_id', $request->student_id)
+                ->where('parent_id', '!=', $guardian->id)
+                ->exists();
+            if ($already) {
+                $siswa = Student::find($request->student_id);
+                return back()->with('error', 'Siswa ' . ($siswa?->nama_lengkap ?? '') . ' sudah terdaftar ke wali lain.')->withInput();
+            }
+            $exists = $guardian->students()->where('student_id', $request->student_id)->exists();
+            if (!$exists) {
+                $guardian->students()->attach($request->student_id, [
+                    'is_primary' => true,
+                    'id'         => (string) \Illuminate\Support\Str::uuid(),
+                ]);
+            }
+        } else {
+            // Hapus link jika student_id kosong
+            $guardian->students()->detach();
+        }
+
+        return back()->with('success', 'Data orang tua/wali berhasil diperbarui.');
+    }
+
+    public function deleteGuardian(Guardian $guardian)
+    {
+        $guardian->students()->detach();
+        $guardian->delete();
+        return back()->with('success', 'Data orang tua/wali berhasil dihapus.');
     }
 
     // ─── ACADEMIC YEARS + SEMESTERS ────────────────────────────────────
