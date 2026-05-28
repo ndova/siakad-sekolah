@@ -42,7 +42,7 @@
             @if($kelas->waliKelas)<div class="flex items-center gap-1.5"><i data-lucide="user-check" class="w-3 h-3"></i> {{ $kelas->waliKelas->name }}</div>@endif
         </div>
         <div class="flex gap-2">
-            <button data-edit-id="{{ $kelas->id }}" data-edit-code="{{ $kelas->code }}" data-edit-name="{{ addslashes($kelas->code) }}" data-edit-year="{{ $kelas->academic_year_id }}" data-edit-major="{{ $kelas->major_id ?? '' }}" data-edit-ht="{{ $kelas->wali_kelas_id ?? '' }}" data-edit-active="{{ $kelas->is_active }}" class="flex-1 py-1.5 rounded-lg bg-slate-50 text-xs font-medium hover:bg-accent-50 hover:text-accent text-center js-edit-btn">Edit</button>
+            <button data-edit-id="{{ $kelas->id }}" data-edit-code="{{ $kelas->code }}" data-edit-tingkat="{{ $kelas->tingkat }}" data-edit-jenjang="{{ $kelas->jenjang }}" data-edit-year="{{ $kelas->academic_year_id }}" data-edit-major="{{ $kelas->major_id ?? '' }}" data-edit-ht="{{ $kelas->wali_kelas_id ?? '' }}" data-edit-active="{{ $kelas->is_active }}" class="flex-1 py-1.5 rounded-lg bg-slate-50 text-xs font-medium hover:bg-accent-50 hover:text-accent text-center js-edit-btn">Edit</button>
             <form method="POST" action="{{ route('master.classes.delete',$kelas->id) }}" onsubmit="event.preventDefault(); showConfirm('Hapus kelas ini?', 'Hapus Kelas', 'Ya, Hapus', () => this.submit());" class="flex-1">
                 @csrf<button class="w-full py-1.5 rounded-lg bg-slate-50 text-xs font-medium hover:bg-red-50 hover:text-red-600">Hapus</button></form>
         </div>
@@ -65,10 +65,13 @@
 <form id="mForm" method="POST" action="{{ route('master.classes.store') }}" class="p-5 space-y-4">
     @csrf<input type="hidden" name="_method" id="mMethod" value="POST">
     <div class="grid grid-cols-2 gap-4">
-        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Kode</label><input name="code" id="mCode" placeholder="7A" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"></div>
-        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tahun Ajaran</label><select name="academic_year_id" id="mYear" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"><option value="">Pilih</option>@foreach($academicYears as $y)<option value="{{ $y->id }}">{{ $y->code }}</option>@endforeach</select></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Kode *</label><input name="code" id="mCode" placeholder="7A" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tahun Ajaran *</label><select name="academic_year_id" id="mYear" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"><option value="">Pilih</option>@foreach($academicYears as $y)<option value="{{ $y->id }}">{{ $y->code }}</option>@endforeach</select></div>
     </div>
-    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama Kelas</label><input name="name" id="mName" placeholder="Kelas 7A" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"></div>
+    <div class="grid grid-cols-2 gap-4">
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tingkat</label><input name="tingkat" id="mTingkat" type="number" min="7" max="12" placeholder="7" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenjang</label><select name="jenjang" id="mJenjang" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"><option value="">Pilih</option><option value="SMP">SMP</option><option value="SMA">SMA</option><option value="SMK">SMK</option></select></div>
+    </div>
     <div class="grid grid-cols-2 gap-4">
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jurusan</label><select name="major_id" id="mMajor" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"><option value="">Umum</option>@foreach($majors as $m)<option value="{{ $m->id }}">{{ $m->name }}</option>@endforeach</select></div>
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Wali Kelas</label><select name="wali_kelas_id" id="mHt" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200"><option value="">-</option>@foreach($teachers as $t)<option value="{{ $t->id }}">{{ $t->name }}</option>@endforeach</select></div>
@@ -82,15 +85,15 @@
 @push('scripts')
 <script>
 function openModal(){reset();document.getElementById('mTitle').textContent='Tambah Kelas';document.getElementById('mForm').action='{{ route("master.classes.store") }}';document.getElementById('mMethod').value='POST';document.getElementById('mod').classList.add('show')}
-function editClass(id,code,name,year,major,ht,active){reset();document.getElementById('mTitle').textContent='Edit Kelas';document.getElementById('mForm').action='{{ url("/backend/master/classes") }}/'+id;document.getElementById('mMethod').value='PUT';document.getElementById('mCode').value=code;document.getElementById('mName').value=name;document.getElementById('mYear').value=year;document.getElementById('mMajor').value=major;document.getElementById('mHt').value=ht;document.getElementById('mActive').checked=active=='1';document.getElementById('mod').classList.add('show')}
-function reset(){['mCode','mName','mYear','mMajor','mHt'].forEach(f=>document.getElementById(f).value='');document.getElementById('mActive').checked=true}
+function editClass(id,code,tingkat,jenjang,year,major,ht,active){reset();document.getElementById('mTitle').textContent='Edit Kelas';document.getElementById('mForm').action='{{ url("/backend/master/classes") }}/'+id;document.getElementById('mMethod').value='PUT';document.getElementById('mCode').value=code;document.getElementById('mTingkat').value=tingkat||'';document.getElementById('mJenjang').value=jenjang||'';document.getElementById('mYear').value=year;document.getElementById('mMajor').value=major;document.getElementById('mHt').value=ht;document.getElementById('mActive').checked=active=='1';document.getElementById('mod').classList.add('show')}
+function reset(){['mCode','mTingkat','mJenjang','mYear','mMajor','mHt'].forEach(f=>{var el=document.getElementById(f);if(el)el.value=''});document.getElementById('mActive').checked=true}
 function closeMod(){document.getElementById('mod').classList.remove('show')}
 // Event delegation
 document.addEventListener('DOMContentLoaded',function(){
     document.querySelector('.grid').addEventListener('click',function(e){
         var btn = e.target.closest('.js-edit-btn');
         if (!btn) return;
-        editClass(btn.dataset.editId, btn.dataset.editCode, btn.dataset.editName, btn.dataset.editYear, btn.dataset.editMajor, btn.dataset.editHt, btn.dataset.editActive);
+        editClass(btn.dataset.editId, btn.dataset.editCode, btn.dataset.editTingkat, btn.dataset.editJenjang, btn.dataset.editYear, btn.dataset.editMajor, btn.dataset.editHt, btn.dataset.editActive);
     });
     var mod = document.getElementById('mod');
     if (mod) mod.addEventListener('click',function(e){if(e.target===this)closeMod();});

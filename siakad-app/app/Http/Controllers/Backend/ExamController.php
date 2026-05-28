@@ -124,6 +124,9 @@ class ExamController extends Controller
                 'questions' => $questions,
                 'count' => $questions->count(),
                 'pg' => $questions->where('type','pg')->count(),
+                'bs' => $questions->where('type','bs')->count(),
+                'jodoh' => $questions->where('type','jodoh')->count(),
+                'audio' => $questions->where('type','audio')->count(),
                 'esai' => $questions->where('type','esai')->count(),
             ])->sortBy(fn($g) => $g['subject']->code ?? 'Z');
 
@@ -260,6 +263,7 @@ class ExamController extends Controller
                 'type' => $e->type,
                 'subject_id' => $e->subject_id,
                 'class_ids' => $e->class_ids,
+                'class_codes' => $e->class_codes,
                 'semester_id' => $e->semester_id,
                 'start_time' => \Carbon\Carbon::parse($e->start_time)->format('Y-m-d\TH:i'),
                 'end_time' => \Carbon\Carbon::parse($e->end_time)->format('Y-m-d\TH:i'),
@@ -268,6 +272,7 @@ class ExamController extends Controller
                 'random_answers' => $e->random_answers,
                 'show_result' => $e->show_result,
                 'status' => $e->status,
+                'minimum_score' => $e->minimum_score,
             ];
         });
 
@@ -279,9 +284,9 @@ class ExamController extends Controller
         $data = $request->validate([
             'code' => 'nullable|string|max:30',
             'title' => 'required|string|max:200',
-            'type' => 'required|in:uh,sts,sas,asaj,tryout',
+            'type' => 'required|in:uh,sts,sas,asaj,tryout,remedi',
             'subject_id' => 'required|exists:subjects,id',
-            'class_ids' => 'required|array',
+            'class_ids' => 'nullable|array',
             'semester_id' => 'required|exists:semesters,id',
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
@@ -289,9 +294,10 @@ class ExamController extends Controller
             'random_questions' => 'boolean',
             'random_answers' => 'boolean',
             'show_result' => 'boolean',
+            'minimum_score' => 'nullable|numeric|min:0|max:100',
         ]);
         $data['school_id'] = $this->schoolId();
-        $data['class_ids'] = json_encode($data['class_ids']);
+        $data['class_ids'] = json_encode($data['class_ids'] ?? []);
         $data['created_by'] = auth()->id();
         $data['status'] = 'draft';
         if (empty($data['code'])) $data['code'] = strtoupper(substr($data['type'],0,3)).'-'.now()->format('ymd-His');
@@ -304,9 +310,9 @@ class ExamController extends Controller
         $data = $request->validate([
             'code' => 'nullable|string|max:30',
             'title' => 'required|string|max:200',
-            'type' => 'required|in:uh,sts,sas,asaj,tryout',
+            'type' => 'required|in:uh,sts,sas,asaj,tryout,remedi',
             'subject_id' => 'required|exists:subjects,id',
-            'class_ids' => 'required|array',
+            'class_ids' => 'nullable|array',
             'semester_id' => 'required|exists:semesters,id',
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
@@ -315,8 +321,9 @@ class ExamController extends Controller
             'random_answers' => 'boolean',
             'show_result' => 'boolean',
             'status' => 'required|in:draft,published,ongoing,finished',
+            'minimum_score' => 'nullable|numeric|min:0|max:100',
         ]);
-        $data['class_ids'] = json_encode($data['class_ids']);
+        $data['class_ids'] = json_encode($data['class_ids'] ?? []);
         if (empty($data['code'])) $data['code'] = strtoupper(substr($data['type'], 0, 3)) . '-' . now()->format('ymd-His');
         $exam->update($data);
         return back()->with('success', 'Ujian berhasil diperbarui.');
@@ -368,13 +375,106 @@ class ExamController extends Controller
         $sessions = collect();
 
         if ($examId) {
+            // Re-grade / reset jawaban jodoh/audio
+            $pendingAnswers = ExamAnswer::whereHas('examQuestion', function($q) use ($examId) {
+                $q->where('exam_id', $examId)->whereHas('question', fn($qq) => $qq->whereIn('type', ['jodoh', 'audio']));
+            })->where(function($q) {
+                $q->whereNull('is_correct')->orWhere('is_correct', false);
+            })->with('examQuestion.question')->get();
+
+            foreach ($pendingAnswers as $answer) {
+                $q = $answer->examQuestion->question ?? null;
+                if (!$q) continue;
+
+                // Deteksi jawaban jodoh format label lama (A, B, C...) — reset ke null
+                if ($q->type === 'jodoh' && !empty($answer->selected_options)) {
+                    $isLabelFormat = true;
+                    foreach ($answer->selected_options as $v) {
+                        if (!is_string($v) || strlen($v) !== 1 || !ctype_upper($v)) {
+                            $isLabelFormat = false;
+                            break;
+                        }
+                    }
+                    if ($isLabelFormat) {
+                        $answer->update(['is_correct' => null, 'score' => null]);
+                        continue;
+                    }
+                }
+
+                if ($q->type === 'jodoh') {
+                    $selected = $answer->selected_options ?? [];
+                    $correctValues = array_values($q->options ?? []);
+                    $totalPairs = count($correctValues);
+                    $correctCount = 0;
+                    foreach ($correctValues as $i => $correctVal) {
+                        if (($selected[$i] ?? null) !== null && strtolower($selected[$i]) === strtolower($correctVal ?? '')) {
+                            $correctCount++;
+                        }
+                    }
+                    $maxScore = $answer->examQuestion->score_override ?? $q->score ?? 10;
+                    $answer->update([
+                        'is_correct' => $totalPairs > 0 && $correctCount === $totalPairs,
+                        'score' => $totalPairs > 0 ? round(($correctCount / $totalPairs) * $maxScore, 1) : 0,
+                    ]);
+                } elseif ($q->type === 'audio') {
+                    $selected = $answer->selected_options ?? [];
+                    $selectedVal = !empty($selected) ? strtolower($selected[0]) : null;
+                    $correctVal = strtolower($q->answer_key ?? '');
+                    $isCorrect = $selectedVal !== null && $selectedVal === $correctVal;
+                    $maxScore = $answer->examQuestion->score_override ?? $q->score ?? 10;
+                    $answer->update(['is_correct' => $isCorrect, 'score' => $isCorrect ? $maxScore : 0]);
+                }
+            }
+
+            // Update ExamResult totals setelah re-grade
+            $allSessions = ExamSession::where('exam_id', $examId)->where('status', 'finished')->pluck('id');
+            foreach ($allSessions as $sid) {
+                $answers = ExamAnswer::where('exam_session_id', $sid)->get();
+                $totalScore = $answers->sum('score') ?? 0;
+                $correctCount = $answers->where('is_correct', true)->count();
+                $examObj = Exam::find($examId);
+                $kkm = $examObj->minimum_score ?? ($examObj->total_score * 0.7);
+                ExamResult::where('exam_session_id', $sid)->update([
+                    'total_score' => $totalScore,
+                    'correct_count' => $correctCount,
+                    'wrong_count' => $answers->where('is_correct', false)->count(),
+                    'is_passed' => $totalScore >= $kkm,
+                ]);
+            }
+
             $results = ExamResult::with(['student','exam.subject'])
                 ->where('exam_id', $examId)->orderBy('total_score','desc')->get();
             $sessions = ExamSession::with('answers.examQuestion.question')
                 ->where('exam_id', $examId)->get()->keyBy('id');
+
+            // Data jawaban per siswa untuk modal preview
+            $sessionData = $sessions->map(function($session) {
+                return [
+                    'session_id' => $session->id,
+                    'student_id' => $session->student_id,
+                    'answers' => $session->answers->map(function($answer) {
+                        $q = $answer->examQuestion->question ?? null;
+                        return [
+                            'answer_id' => $answer->id,
+                            'exam_question_id' => $answer->exam_question_id,
+                            'urutan' => $answer->examQuestion->urutan ?? 0,
+                            'type' => $q?->type,
+                            'content' => $q?->content,
+                            'options' => $q?->options,
+                            'answer_key' => $q?->answer_key,
+                            'selected_options' => $answer->selected_options,
+                            'text_answer' => $answer->text_answer,
+                            'is_correct' => $answer->is_correct,
+                            'score' => $answer->score,
+                        ];
+                    })->sortBy('urutan')->values(),
+                ];
+            })->keyBy('student_id');
+        } else {
+            $sessionData = collect();
         }
 
-        return view('backend.exam.results', compact('exams','examId','results','sessions'));
+        return view('backend.exam.results', compact('exams','examId','results','sessions','sessionData'));
     }
 
     public function deleteQuestion(Question $question)
@@ -399,13 +499,75 @@ class ExamController extends Controller
             }
         }
 
+        $kkm = $result->exam->minimum_score ?? ($result->exam->total_score * 0.7);
         $result->update([
             'total_score' => $totalScore,
             'graded_by' => auth()->id(),
             'graded_at' => now(),
-            'is_passed' => $totalScore >= ($result->exam->total_score * 0.7),
+            'is_passed' => $totalScore >= $kkm,
         ]);
 
         return back()->with('success','Nilai esai disimpan.');
+    }
+
+    /** Koreksi jawaban per-soal (jodoh + esai) */
+    public function gradeAnswers(Request $request, ExamResult $result)
+    {
+        $request->validate([
+            'scores' => 'required|array',
+            'scores.*.score' => 'required|numeric|min:0',
+            'scores.*.is_correct' => 'nullable|boolean',
+        ]);
+
+        foreach ($request->scores as $answerId => $data) {
+            $answer = ExamAnswer::find($answerId);
+            if ($answer) {
+                $answer->update([
+                    'score' => $data['score'],
+                    'is_correct' => $data['is_correct'] ?? ($data['score'] > 0),
+                ]);
+            }
+        }
+
+        // Recalculate ExamResult totals
+        $sessionId = $result->exam_session_id;
+        $answers = ExamAnswer::where('exam_session_id', $sessionId)->get();
+        $totalScore = $answers->sum('score') ?? 0;
+        $correctCount = $answers->where('is_correct', true)->count();
+        $wrongCount = $answers->where('is_correct', false)->count();
+        $exam = $result->exam;
+        $kkm = $exam->minimum_score ?? ($exam->total_score * 0.7);
+
+        $result->update([
+            'total_score' => $totalScore,
+            'correct_count' => $correctCount,
+            'wrong_count' => $wrongCount,
+            'graded_by' => auth()->id(),
+            'graded_at' => now(),
+            'is_passed' => $totalScore >= $kkm,
+        ]);
+
+        return back()->with('success', 'Jawaban berhasil dinilai. Total skor: ' . $totalScore);
+    }
+
+    /**
+     * Hapus hasil ujian beserta sesi dan jawaban terkait.
+     */
+    public function deleteResult(ExamResult $result)
+    {
+        $examId = $result->exam_id;
+        $studentName = $result->student?->nama_lengkap ?? 'Siswa';
+
+        // Hapus sesi ujian (cascade delete answers)
+        if ($result->examSession) {
+            $result->examSession->answers()->delete();
+            $result->examSession->delete();
+        }
+
+        // Hapus hasil (grades akan set exam_result_id ke null via nullOnDelete)
+        $result->delete();
+
+        return redirect()->route('exam.results', ['exam_id' => $examId])
+            ->with('success', "Hasil ujian $studentName berhasil dihapus.");
     }
 }

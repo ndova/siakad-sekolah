@@ -79,12 +79,12 @@ $footerLinkHtml = 'Orang tua? <a href="' . route('portal.ortu.login') . '" class
         });
 
         async function doLogin() {
-            const email = document.getElementById('email').value.trim();
+            const identifier = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const errEl = document.getElementById('errorBox');
             const btn = document.getElementById('loginBtn');
 
-            if (!email || !password) {
+            if (!identifier || !password) {
                 errEl.textContent = 'Email/NIS dan password harus diisi.';
                 errEl.classList.remove('hidden');
                 return;
@@ -102,7 +102,7 @@ $footerLinkHtml = 'Orang tua? <a href="' . route('portal.ortu.login') . '" class
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     },
-                    body: JSON.stringify({ email, password }),
+                    body: JSON.stringify({ identifier, password }),
                 });
 
                 const data = await res.json();

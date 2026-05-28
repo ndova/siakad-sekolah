@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Student\DashboardController as StudentDashboard;
 use App\Http\Controllers\Api\Student\GradeController as StudentGrade;
 use App\Http\Controllers\Api\Student\AttendanceController as StudentAttendance;
 use App\Http\Controllers\Api\Student\ProfileController as StudentProfile;
+use App\Http\Controllers\Api\Student\ExamController as StudentExam;
 use App\Http\Controllers\Api\Guardian\DashboardController as GuardianDashboard;
 use App\Http\Controllers\Api\Guardian\PaymentController as GuardianPayment;
 use App\Http\Controllers\Api\Teacher\GradeController as TeacherGrade;
@@ -33,6 +34,15 @@ Route::prefix('v1')->group(function () {
     // Public: Info sekolah
     Route::get('/school/info', [SettingsController::class, 'apiShow']);
 
+    // Public: Waktu server
+    Route::get('/server-time', function () {
+        return response()->json([
+            'server_time' => now()->toISOString(),
+            'timestamp' => now()->timestamp,
+            'timezone' => config('app.timezone'),
+        ]);
+    });
+
     // Public: Fingerprint push (dari mesin absen)
     Route::post('/fingerprint/push', [FingerprintController::class, 'apiPush']);
 
@@ -56,6 +66,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/attendance/summary', [StudentAttendance::class, 'summary']);
             Route::get('/reports/{semesterId}', [StudentDashboard::class, 'report']);
             Route::get('/exam/schedule', [StudentDashboard::class, 'examSchedule']);
+            Route::post('/exam/{exam}/start', [StudentExam::class, 'startExam']);
+            Route::get('/exam/{exam}/questions', [StudentExam::class, 'getQuestions']);
+            Route::post('/exam/{exam}/answer', [StudentExam::class, 'submitAnswer']);
+            Route::post('/exam/{exam}/finish', [StudentExam::class, 'finishExam']);
+            Route::put('/exam/{exam}/time', [StudentExam::class, 'saveTime']);
             Route::get('/payments', [StudentDashboard::class, 'payments']);
         });
 
@@ -91,6 +106,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/exams/{exam}/questions', [TeacherExam::class, 'addQuestions']);
             Route::get('/exams/{exam}/results', [TeacherExam::class, 'results']);
             Route::post('/exam-results/{result}/grade', [TeacherExam::class, 'grade']);
+            Route::delete('/exam-results/{result}', [TeacherExam::class, 'destroyResult']);
 
             // Presensi
             Route::get('/attendance/jadwal-hari-ini', [TeacherAttendance::class, 'jadwalHariIni']);

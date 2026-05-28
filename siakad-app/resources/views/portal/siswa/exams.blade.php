@@ -22,24 +22,36 @@
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        const data = await apiFetch(`${API_BASE}/student/exam/schedule`);
-        const exams = data.data || [];
+        const [timeRes, examRes] = await Promise.all([
+            fetch(`${API_BASE}/server-time`).then(r => r.json()),
+            apiFetch(`${API_BASE}/student/exam/schedule`)
+        ]);
+        const serverNow = new Date(timeRes.server_time);
+        const exams = examRes.data || [];
         const el = document.getElementById('examCards');
         if (exams.length) {
             el.innerHTML = exams.map(e => {
                 const start = new Date(e.start_time), end = new Date(e.end_time);
-                const now = new Date();
-                const isActive = now >= start && now <= end;
-                return `<div class="card p-5">
+                const isActive = serverNow >= start && serverNow <= end;
+                const isFinished = e.session_status === 'finished';
+                const isInProgress = e.session_status === 'in_progress';
+                return `<div class="card p-5 flex flex-col">
                     <div class="flex items-start justify-between mb-3">
                         <span class="inline-flex px-2 py-1 rounded-lg text-xs font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-primary-100 text-primary-700'}">${isActive ? 'SEDANG BERLANGSUNG' : e.type?.toUpperCase() || 'UJIAN'}</span>
                         <span class="text-xs text-slate-400">${e.duration} menit</span>
                     </div>
                     <h3 class="font-semibold text-slate-800 mb-2">${e.title}</h3>
-                    <div class="space-y-2 text-xs text-slate-500">
+                    ${e.subject ? `<p class="text-xs text-slate-400 mb-2">${e.subject}</p>` : ''}
+                    <div class="space-y-2 text-xs text-slate-500 mb-3 flex-1">
                         <div class="flex items-center gap-2"><i data-lucide="calendar" class="w-3.5 h-3.5"></i> ${start.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
                         <div class="flex items-center gap-2"><i data-lucide="clock" class="w-3.5 h-3.5"></i> ${start.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})} - ${end.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</div>
                         <div class="flex items-center gap-2"><i data-lucide="help-circle" class="w-3.5 h-3.5"></i> ${e.total_questions || 0} soal</div>
+                    </div>
+                    <div class="mt-auto pt-3 border-t border-slate-50">
+                        ${isFinished ? `<div class="text-center text-sm"><span class="font-semibold text-slate-700">Skor: ${e.my_score != null ? e.my_score : '-'}</span> <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium ${e.is_passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${e.is_passed ? 'Lulus' : 'Tidak Lulus'}</span></div>`
+                        : isInProgress ? `<a href="/portal/siswa/exam/${e.id}/take" class="btn-accent w-full text-center py-2 rounded-lg text-sm font-semibold inline-block">Lanjutkan Ujian</a>`
+                        : isActive ? `<a href="/portal/siswa/exam/${e.id}/take" class="btn-accent w-full text-center py-2 rounded-lg text-sm font-semibold inline-block">Mulai Ujian</a>`
+                        : `<button class="w-full py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-400 cursor-not-allowed" disabled>Belum Tersedia</button>`}
                     </div>
                 </div>`;
             }).join('');

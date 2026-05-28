@@ -103,9 +103,9 @@ function editClassSubjectModal(id, subjectId, semesterId, teacherId, jp){
     document.getElementById('modTitle').textContent = 'Edit Mapel';
     document.getElementById('modForm').action = '{{ url("/backend/master/class-subject") }}/' + id;
     document.getElementById('modMethod').value = 'PUT';
-    // Disable subject & class — cannot change mapping
-    document.getElementById('subjectSelect').disabled = true;
-    document.getElementById('subjectSelect').required = false;
+    // Enable subject — bisa rubah mata pelajaran
+    document.getElementById('subjectSelect').disabled = false;
+    document.getElementById('subjectSelect').required = true;
     document.getElementById('subjectSelect').value = subjectId;
     document.getElementById('semesterSelect').value = semesterId || '';
     document.getElementById('teacherSelect').required = true;

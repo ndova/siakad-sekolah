@@ -30,7 +30,7 @@
     <h3 class="font-semibold text-slate-800 mb-1">{{ $exam->title }}</h3>
     <div class="space-y-1 text-xs text-slate-400 mb-3">
         <div class="flex items-center gap-1.5"><i data-lucide="book-open" class="w-3 h-3"></i> {{ $exam->subject->name ?? '-' }}</div>
-        <div class="flex items-center gap-1.5"><i data-lucide="school" class="w-3 h-3"></i> {{ is_array($exam->class_ids) ? count($exam->class_ids) : 0 }} kelas</div>
+        <div class="flex items-center gap-1.5"><i data-lucide="school" class="w-3 h-3"></i> {{ $exam->class_codes }}</div>
         <div class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3 h-3"></i> {{ $exam->duration ?? 60 }} menit | {{ \Carbon\Carbon::parse($exam->start_time)->format('d/m/Y H:i') }}</div>
     </div>
     <div class="flex gap-2">
@@ -49,7 +49,7 @@
 <div class="modal-overlay" id="mod"><div class="modal-box"><div class="p-5 border-b flex justify-between"><h3 class="font-semibold">Buat Ujian</h3><button onclick="closeMod()" class="p-1 rounded-lg hover:bg-slate-100 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button></div>
 <form method="POST" action="{{ route('exam.list.store') }}" class="p-5 space-y-4">
     @csrf
-    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Ujian</label><select name="type" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"><option value="uh">Ulangan Harian</option><option value="sts">STS</option><option value="sas">SAS</option><option value="asaj">ASAJ</option><option value="tryout">Tryout</option></select></div>
+    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Ujian</label><select name="type" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"><option value="uh">Ulangan Harian</option><option value="sts">STS</option><option value="sas">SAS</option><option value="asaj">ASAJ</option><option value="tryout">Tryout</option><option value="remedi">Ujian Remedi</option></select></div>
     <div class="grid grid-cols-2 gap-4">
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Kode (opsional)</label><input name="code" placeholder="UH-1" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Judul</label><input name="title" placeholder="Ulangan Harian 1" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
@@ -64,6 +64,7 @@
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Selesai</label><input name="end_time" type="datetime-local" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
     </div>
     <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Durasi (menit)</label><input name="duration" type="number" min="1" value="60" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
+    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">KKM / Nilai Minimal (opsional)</label><input name="minimum_score" type="number" step="0.01" min="0" max="100" placeholder="Kosongkan untuk 70% dari total skor" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
     <div class="flex gap-3 pt-2"><button class="flex-1 px-4 py-2.5 rounded-xl btn-accent text-white text-sm font-medium">Simpan</button><button type="button" onclick="closeMod()" class="px-4 py-2.5 rounded-xl border text-sm text-slate-600">Batal</button></div>
 </form></div></div>
 
@@ -90,7 +91,7 @@
 <div class="modal-overlay" id="editMod"><div class="modal-box"><div class="p-5 border-b flex justify-between"><h3 class="font-semibold">Edit Ujian</h3><button onclick="closeEdit()" class="p-1 rounded-lg hover:bg-slate-100 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button></div>
 <form id="editForm" method="POST" action="" class="p-5 space-y-4">
     @csrf @method('PUT')
-    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Ujian</label><select name="type" id="editType" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"><option value="uh">Ulangan Harian</option><option value="sts">STS</option><option value="sas">SAS</option><option value="asaj">ASAJ</option><option value="tryout">Tryout</option></select></div>
+    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Ujian</label><select name="type" id="editType" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"><option value="uh">Ulangan Harian</option><option value="sts">STS</option><option value="sas">SAS</option><option value="asaj">ASAJ</option><option value="tryout">Tryout</option><option value="remedi">Ujian Remedi</option></select></div>
     <div class="grid grid-cols-2 gap-4">
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Kode (opsional)</label><input name="code" id="editCode" placeholder="UH-1" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Judul</label><input name="title" id="editTitle" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
@@ -105,6 +106,7 @@
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Selesai</label><input name="end_time" id="editEnd" type="datetime-local" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
     </div>
     <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Durasi (menit)</label><input name="duration" id="editDuration" type="number" min="1" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
+    <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">KKM / Nilai Minimal (opsional)</label><input name="minimum_score" id="editMinScore" type="number" step="0.01" min="0" max="100" placeholder="Kosongkan untuk 70% dari total skor" class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"></div>
     <div class="grid grid-cols-2 gap-4">
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Status</label><select name="status" id="editStatus" required class="w-full px-3 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200"><option value="draft">Draft</option><option value="published">Published</option><option value="ongoing">Ongoing</option><option value="finished">Finished</option></select></div>
         <div class="space-y-2">
@@ -138,6 +140,7 @@ function openEditModal(examId) {
     document.getElementById('editStart').value = d.start_time;
     document.getElementById('editEnd').value = d.end_time;
     document.getElementById('editDuration').value = d.duration;
+    document.getElementById('editMinScore').value = d.minimum_score ?? '';
     document.getElementById('editStatus').value = d.status;
     document.getElementById('editRandomQ').checked = d.random_questions;
     document.getElementById('editRandomA').checked = d.random_answers;

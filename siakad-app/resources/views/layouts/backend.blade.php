@@ -34,6 +34,8 @@
             border-right: 1px solid #e2e8f0;
             position: relative;
             z-index: 30;
+            height: 100vh;
+            overflow: hidden;
         }
         .sidebar-brand {
             display: flex;
@@ -269,7 +271,8 @@
                     <i data-lucide="layout-dashboard"></i> Dashboard
                 </a>
 
-                {{-- Master Data --}}
+                {{-- Master Data (hanya superadmin/admin) --}}
+                @unless(in_array(auth()->user()->role, ['guru']))
                 <div class="sidebar-section">Master Data</div>
                 @if(in_array(auth()->user()->role, ['superadmin', 'admin']))
                 <a href="{{ url('/backend/master/users') }}" class="sidebar-link {{ request()->is('backend/master/users*') ? 'active' : '' }}">
@@ -301,6 +304,7 @@
                     <i data-lucide="settings"></i> Pengaturan
                 </a>
                 @endif
+                @endunless
 
                 {{-- Akademik --}}
                 <div class="sidebar-section">Akademik</div>
@@ -355,21 +359,20 @@
                     <i data-lucide="trending-up"></i> Laporan
                 </a>
                 @endunless
-            </nav>
 
-            {{-- Staff & Pegawai --}}
-            <div class="sidebar-section">Staff &amp; Pegawai</div>
+            {{-- Staff & Pegawai (hanya superadmin/admin) --}}
             @unless(in_array(auth()->user()->role, ['guru']))
+            <div class="sidebar-section">Staff &amp; Pegawai</div>
             <a href="{{ url('/backend/staff') }}" class="sidebar-link {{ request()->is('backend/staff') ? 'active' : '' }}">
                 <i data-lucide="users"></i> Data Pegawai
             </a>
-            @endunless
             <a href="{{ url('/backend/staff/attendance') }}" class="sidebar-link {{ request()->is('backend/staff/attendance') ? 'active' : '' }}">
                 <i data-lucide="clipboard-check"></i> Grid Absensi
             </a>
             <a href="{{ url('/backend/staff/attendance/recap') }}" class="sidebar-link {{ request()->is('backend/staff/attendance/recap*') ? 'active' : '' }}">
                 <i data-lucide="bar-chart-3"></i> Rekap Absensi
             </a>
+            @endunless
 
             {{-- Absensi Manual --}}
             <div class="sidebar-section">Absensi Manual</div>
@@ -401,6 +404,7 @@
                 <i data-lucide="scroll-text"></i> Log Sinkronisasi
             </a>
             @endif
+            </nav>
 
             {{-- Sidebar footer --}}
             <div style="padding:12px;border-top:1px solid #e2e8f0;">

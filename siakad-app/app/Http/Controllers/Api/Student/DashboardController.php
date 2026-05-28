@@ -61,7 +61,7 @@ class DashboardController extends Controller
         $upcomingExams = Exam::where(function ($q) {
             $q->where('status', 'published')->orWhere('status', 'ongoing');
         })
-            ->whereJsonContains('class_ids', $student->class_id)
+            ->where('class_ids', 'LIKE', '%'.$student->class_id.'%')
             ->where('start_time', '>', now()->subHours(1))
             ->orderBy('start_time')
             ->limit(5)
@@ -155,7 +155,7 @@ class DashboardController extends Controller
         ];
 
         $p5Projects = P5Project::where('semester_id', $semester->id)
-            ->whereJsonContains('class_ids', $student->class_id)
+            ->where('class_ids', 'LIKE', '%'.$student->class_id.'%')
             ->get();
 
         $p5Assessments = P5Assessment::whereIn('p5_project_id', $p5Projects->pluck('id'))
@@ -235,7 +235,7 @@ class DashboardController extends Controller
 
         $exams = Exam::with(['subject:id,name,code'])
             ->whereIn('status', ['published', 'ongoing', 'finished'])
-            ->whereJsonContains('class_ids', $student->class_id)
+            ->where('class_ids', 'LIKE', '%'.$student->class_id.'%')
             ->orderBy('start_time')
             ->get()
             ->map(function ($exam) use ($student) {

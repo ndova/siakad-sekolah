@@ -119,8 +119,8 @@
                         <td class="py-2.5 px-2 text-slate-400 align-top">{{ $no++ }}</td>
                         <td class="py-2.5 px-2 font-medium text-slate-700 align-top">{{ $mapel['nama'] }}</td>
                         <td class="py-2.5 px-2 text-center font-bold text-slate-500 align-top">{{ $mapel['kkm'] ?? 70 }}</td>
-                        <td class="py-2.5 px-2 text-center font-bold text-slate-800 align-top">{{ $mapel['ki3'] !== null ? number_format($mapel['ki3'], 0) : '-' }}</td>
-                        <td class="py-2.5 px-2 text-center font-bold text-slate-800 align-top">{{ $mapel['ki4'] !== null ? number_format($mapel['ki4'], 0) : '-' }}</td>
+                        <td class="py-2.5 px-2 text-center font-bold text-slate-800 align-top">{{ ($mapel['ki3'] ?? null) !== null ? number_format($mapel['ki3'], 0) : '-' }}</td>
+                        <td class="py-2.5 px-2 text-center font-bold text-slate-800 align-top">{{ ($mapel['ki4'] ?? null) !== null ? number_format($mapel['ki4'], 0) : '-' }}</td>
                         <td class="py-2.5 px-2 text-center align-top">
                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold {{ $predikatClass }}">
                                 {{ $predikat }}

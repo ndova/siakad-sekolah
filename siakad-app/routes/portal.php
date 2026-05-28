@@ -15,6 +15,7 @@ Route::prefix('portal/siswa')->group(function () {
     Route::get('/grades', fn() => view('portal.siswa.grades'))->name('portal.siswa.grades');
     Route::get('/attendance', fn() => view('portal.siswa.attendance'))->name('portal.siswa.attendance');
     Route::get('/exams', fn() => view('portal.siswa.exams'))->name('portal.siswa.exams');
+    Route::get('/exam/{exam}/take', fn($exam) => view('portal.siswa.exam-take', ['examId' => $exam]))->name('portal.siswa.exam.take');
     Route::get('/payments', fn() => view('portal.siswa.payments'))->name('portal.siswa.payments');
     Route::get('/profile', fn() => view('portal.siswa.profile'))->name('portal.siswa.profile');
 });
