@@ -29,10 +29,18 @@ class AcademicController extends Controller
     // ─── CURRICULUM ────────────────────────────────────────────────────
     public function curriculum(Request $request)
     {
+        $user = auth()->user();
         $curricula = Curriculum::where('school_id', $this->schoolId())->with('academicYear')->orderBy('created_at','desc')->get();
         $subjects  = Subject::where('school_id', $this->schoolId())->where('is_active', true)->orderBy('code')->get();
         $curriculum = $request->curriculum_id ? Curriculum::with(['learningOutcomes.learningObjectives'])->find($request->curriculum_id) : $curricula->first();
-        $classSubjects = ClassSubject::whereHas('schoolClass', fn($q)=>$q->where('school_id',$this->schoolId()))->with(['schoolClass','subject'])->paginate(20)->withQueryString();
+
+        $classSubjectsQuery = ClassSubject::with(['schoolClass','subject'])
+            ->whereHas('schoolClass', fn($q)=>$q->where('school_id',$this->schoolId()));
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $classSubjectsQuery->where('teacher_id', $user->id);
+        }
+        $classSubjects = $classSubjectsQuery->paginate(20)->withQueryString();
+
         $semesters = Semester::whereHas('academicYear', fn($q)=>$q->where('school_id',$this->schoolId()))->where('is_active',true)->get();
         $activeYearId = $this->activeYearId();
         return view('backend.academic.curriculum', compact('curricula','subjects','curriculum','classSubjects','semesters','activeYearId'));
@@ -473,11 +481,15 @@ class AcademicController extends Controller
             return back()->with('error', 'Data semester atau kelas tidak ditemukan.');
         }
 
-        // ─── Mapel ───
-        $classSubjects = ClassSubject::with(['subject'])
-            ->where('class_id', $class->id)
-            ->orderBy('id')
-            ->get();
+        // ─── Mapel — guru hanya lihat mapel yang diampu ───
+        $classSubjectsQuery = ClassSubject::with(['subject'])
+            ->where('class_id', $class->id);
+
+        $user = auth()->user();
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $classSubjectsQuery->where('teacher_id', $user->id);
+        }
+        $classSubjects = $classSubjectsQuery->orderBy('id')->get();
 
         // ─── Report yang sudah ada ───
         $existingReports = Report::where('student_id', $student->id)
@@ -606,6 +618,17 @@ class AcademicController extends Controller
 
         if (!$semester || !$class) {
             return back()->with('error', 'Data semester atau kelas tidak ditemukan.');
+        }
+
+        // Guru hanya bisa lihat rapor siswa di kelas yang diampu
+        $user = auth()->user();
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $taughtClassIds = ClassSubject::where('teacher_id', $user->id)
+                ->whereHas('schoolClass', fn($q) => $q->where('school_id', $schoolId))
+                ->pluck('class_id')->unique();
+            if (!$taughtClassIds->contains($class->id)) {
+                abort(403, 'Anda tidak mengajar di kelas ini.');
+            }
         }
 
         // ─── Fase (Kurikulum Merdeka) ───
@@ -801,7 +824,13 @@ class AcademicController extends Controller
             }
         }
 
-        $classes = SchoolClass::where('school_id', $this->schoolId())->where('is_active',true)->orderBy('code')->get();
+        // Daftar kelas — dibatasi untuk guru/walikelas
+        $classQuery = SchoolClass::where('school_id', $this->schoolId())->where('is_active', true);
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $taughtClassIds = $myClassSubjects->pluck('class_id')->unique();
+            $classQuery->whereIn('id', $taughtClassIds);
+        }
+        $classes = $classQuery->orderBy('code')->get();
         $students = collect();
         $attendances = collect();
         $classSubject = null;
@@ -837,6 +866,14 @@ class AcademicController extends Controller
             'status' => 'required|in:hadir,izin,sakit,alfa,terlambat,tidak_hadir',
             'keterangan' => 'nullable|string|max:255',
         ]);
+
+        // Guru hanya bisa input presensi untuk mapel yang diampu
+        $user = auth()->user();
+        if (in_array($user->role, ['guru', 'walikelas']) && $data['class_subject_id']) {
+            $taught = ClassSubject::where('teacher_id', $user->id)->where('id', $data['class_subject_id'])->exists();
+            if (!$taught) abort(403, 'Anda tidak mengajar mapel ini.');
+        }
+
         $data['semester_id'] = $this->activeSemesterId();
         $data['created_by'] = auth()->id();
 
@@ -862,6 +899,21 @@ class AcademicController extends Controller
             'status.*' => 'required|in:hadir,izin,sakit,alfa,terlambat,tidak_hadir',
             'keterangan' => 'nullable|array',
         ]);
+
+        // Guru hanya bisa input presensi untuk mapel/kelas yang diampu
+        $user = auth()->user();
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $taughtSubjectIds = ClassSubject::where('teacher_id', $user->id)->pluck('id');
+            if ($data['class_subject_id'] && !$taughtSubjectIds->contains($data['class_subject_id'])) {
+                abort(403, 'Anda tidak mengajar mapel ini.');
+            }
+            if ($data['class_id']) {
+                $taughtClassIds = ClassSubject::where('teacher_id', $user->id)->pluck('class_id')->unique();
+                if (!$taughtClassIds->contains($data['class_id'])) {
+                    abort(403, 'Anda tidak mengajar di kelas ini.');
+                }
+            }
+        }
 
         $semesterId = $this->activeSemesterId();
         foreach ($data['status'] as $studentId => $status) {
@@ -899,10 +951,18 @@ class AcademicController extends Controller
             if ($homeroom) $classId = $homeroom->id;
         }
 
-        $classes = SchoolClass::where('school_id', $this->schoolId())
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->get();
+        // Daftar kelas — dibatasi untuk guru/walikelas
+        $classQuery = SchoolClass::where('school_id', $this->schoolId())->where('is_active', true);
+        if (in_array($user->role, ['guru', 'walikelas'])) {
+            $taughtIds = ClassSubject::where('teacher_id', $user->id)
+                ->whereHas('schoolClass', fn($q) => $q->where('school_id', $this->schoolId()))
+                ->pluck('class_id')->unique();
+            $classQuery->whereIn('id', $taughtIds);
+            if ($classId && !$taughtIds->contains($classId)) {
+                $classId = $taughtIds->first();
+            }
+        }
+        $classes = $classQuery->orderBy('code')->get();
 
         $students = collect();
         $recapData = collect();

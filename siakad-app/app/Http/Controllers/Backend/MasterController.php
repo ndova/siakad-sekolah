@@ -42,7 +42,8 @@ class MasterController extends Controller
             ->orderBy('name')->paginate($perPage)->withQueryString();
         $subjects = Subject::where('school_id', $this->schoolId())->where('is_active', true)->orderBy('code')->get();
         $students = Student::where('school_id', $this->schoolId())->where('status', 'aktif')->orderBy('nama_lengkap')->get();
-        return view('backend.master.users', compact('users', 'subjects', 'students', 'perPage'));
+        $classes = SchoolClass::where('school_id', $this->schoolId())->where('is_active', true)->orderBy('code')->get();
+        return view('backend.master.users', compact('users', 'subjects', 'students', 'classes', 'perPage'));
     }
 
     public function storeUser(Request $request)
@@ -72,6 +73,11 @@ class MasterController extends Controller
             'guardian_phone'    => 'nullable|string|max:20',
             'guardian_alamat'   => 'nullable|string',
             'student_id'        => 'nullable|exists:students,id',
+            // Data guru (jika role=guru)
+            'subject_ids' => 'nullable|array',
+            'subject_ids.*' => 'exists:subjects,id',
+            'class_ids'    => 'nullable|array',
+            'class_ids.*'  => 'exists:classes,id',
         ]);
         $data['school_id'] = $this->schoolId();
         $data['is_active'] = true;
@@ -131,14 +137,13 @@ class MasterController extends Controller
             }
         }
 
-        // Assign mata pelajaran untuk role guru
+        // Assign mata pelajaran + kelas untuk role guru
         if ($data['role'] === 'guru' && $request->filled('subject_ids')) {
             $subjectIds = (array) $request->subject_ids;
-            // Assign ke kelas aktif (placeholder, admin bisa atur ulang via Kelas-Mapel)
-            $activeClasses = SchoolClass::where('school_id', $this->schoolId())
-                ->where('is_active', true)->pluck('id');
+            $classIds = $request->filled('class_ids') ? (array) $request->class_ids
+                : SchoolClass::where('school_id', $this->schoolId())->where('is_active', true)->pluck('id')->toArray();
             foreach ($subjectIds as $subjectId) {
-                foreach ($activeClasses as $classId) {
+                foreach ($classIds as $classId) {
                     ClassSubject::firstOrCreate([
                         'class_id' => $classId,
                         'subject_id' => $subjectId,
@@ -535,6 +540,82 @@ class MasterController extends Controller
             ->orderBy('name')->paginate($perPage)->withQueryString();
         $classes = SchoolClass::where('school_id', $this->schoolId())->where('is_active',true)->get();
         return view('backend.master.teachers', compact('teachers','classes', 'perPage'));
+    }
+
+    public function showTeacher(User $user)
+    {
+        if ($user->school_id !== $this->schoolId()) abort(404);
+        $user->load('classSubjects.subject', 'classSubjects.schoolClass', 'homeroomClass');
+        $classSubjects = $user->classSubjects->groupBy('class_id')->map(fn($items) => [
+            'class_id'   => $items->first()->class_id,
+            'class_code' => $items->first()->schoolClass?->code,
+            'subjects'   => $items->map(fn($cs) => ['id' => $cs->subject_id, 'name' => $cs->subject?->name]),
+        ])->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id'         => $user->id,
+                'name'       => $user->name,
+                'email'      => $user->email,
+                'nip'        => $user->nip,
+                'phone'      => $user->phone,
+                'role'       => $user->role,
+                'is_active'  => $user->is_active,
+                'subject_ids' => $user->classSubjects->pluck('subject_id')->unique()->values(),
+                'class_ids'   => $user->classSubjects->pluck('class_id')->unique()->values(),
+                'class_subjects' => $classSubjects,
+                'homeroom_class' => $user->homeroomClass?->code,
+            ],
+        ]);
+    }
+
+    public function updateTeacher(Request $request, User $user)
+    {
+        if ($user->school_id !== $this->schoolId()) abort(404);
+
+        $data = $request->validate([
+            'name'      => 'required|string|max:200',
+            'email'     => ['required','email', Rule::unique('users')->ignore($user->id)],
+            'role'      => 'required|in:guru,walikelas,kepsek,admin,tata_usaha,bk,perpustakaan,bendahara',
+            'nip'       => 'nullable|string|max:30',
+            'phone'     => 'nullable|string|max:20',
+            'is_active' => 'boolean',
+            'subject_ids' => 'nullable|array',
+            'subject_ids.*' => 'exists:subjects,id',
+            'class_ids'    => 'nullable|array',
+            'class_ids.*'  => 'exists:classes,id',
+        ]);
+        if ($request->filled('password')) {
+            $data['password'] = $request->password;
+        }
+        $user->update($data);
+
+        // Sync mapel + kelas
+        ClassSubject::where('teacher_id', $user->id)->delete();
+        $subjectIds = (array) $request->subject_ids;
+        $classIds = (array) $request->class_ids;
+        if (!empty($subjectIds) && !empty($classIds)) {
+            foreach ($subjectIds as $subjectId) {
+                foreach ($classIds as $classId) {
+                    ClassSubject::create([
+                        'class_id'   => $classId,
+                        'subject_id' => $subjectId,
+                        'teacher_id' => $user->id,
+                    ]);
+                }
+            }
+        }
+
+        return back()->with('success', 'Data guru berhasil diperbarui.');
+    }
+
+    public function deleteTeacher(User $user)
+    {
+        if ($user->school_id !== $this->schoolId()) abort(403);
+        ClassSubject::where('teacher_id', $user->id)->delete();
+        $user->delete();
+        return back()->with('success', 'Guru berhasil dihapus.');
     }
 
     // ─── GUARDIANS (ORANG TUA / WALI) ─────────────────────────────────

@@ -18,13 +18,25 @@ class AttendanceManualController extends Controller
 
     public function siswaForm(Request $request)
     {
+        $user = auth()->user();
         $classId = $request->get('class_id');
         $tanggal = $request->get('tanggal', now()->format('Y-m-d'));
 
-        $classes = SchoolClass::where('school_id', $this->schoolId())
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->get();
+        $classQuery = SchoolClass::where('school_id', $this->schoolId())
+            ->where('is_active', true);
+
+        // Guru hanya lihat kelas yang diampu
+        if ($user->role === 'guru') {
+            $taughtClassIds = \App\Models\ClassSubject::where('teacher_id', $user->id)
+                ->whereHas('schoolClass', fn($q) => $q->where('school_id', $this->schoolId()))
+                ->pluck('class_id')->unique();
+            $classQuery->whereIn('id', $taughtClassIds);
+            if ($classId && !in_array($classId, $taughtClassIds->toArray())) {
+                $classId = $taughtClassIds->first();
+            }
+        }
+
+        $classes = $classQuery->orderBy('code')->get();
 
         $students = collect();
         $existingAttendance = collect();

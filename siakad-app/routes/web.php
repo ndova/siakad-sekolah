@@ -62,6 +62,9 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
         Route::middleware(['role:' . implode(',', array_diff(Role::internalRoles(), ['guru']))])->group(function () {
             // Teachers
             Route::get('/master/teachers', [MasterController::class, 'teachers'])->name('master.teachers');
+            Route::get('/master/teachers/{user}', [MasterController::class, 'showTeacher'])->name('master.teachers.show');
+            Route::put('/master/teachers/{user}', [MasterController::class, 'updateTeacher'])->name('master.teachers.update');
+            Route::post('/master/teachers/{user}/delete', [MasterController::class, 'deleteTeacher'])->name('master.teachers.delete');
 
             // Master Data (guru tidak bisa akses)
             Route::prefix('master')->group(function () {

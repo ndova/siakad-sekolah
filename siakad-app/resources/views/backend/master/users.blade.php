@@ -197,6 +197,20 @@
                 @if($subjects->isEmpty())
                 <p class="text-xs text-slate-400 mt-1">Belum ada mata pelajaran. Tambahkan di menu Mapel terlebih dahulu.</p>
                 @endif
+                <div class="mt-3">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Kelas Mengajar <span class="text-slate-400 font-normal">(pilih kelas yang diajar)</span></label>
+                    <div class="max-h-32 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">
+                        @foreach($classes as $cls)
+                        <label class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-sm">
+                            <input type="checkbox" name="class_ids[]" value="{{ $cls->id }}" class="rounded accent-accent">
+                            <span>{{ $cls->code }} — {{ $cls->name }} ({{ $cls->tingkat }})</span>
+                        </label>
+                        @endforeach
+                    </div>
+                    @if($classes->isEmpty())
+                    <p class="text-xs text-slate-400 mt-1">Belum ada kelas aktif.</p>
+                    @endif
+                </div>
             </div>
             {{-- Fields khusus Siswa --}}
             <div id="studentSection" style="display:none;">
