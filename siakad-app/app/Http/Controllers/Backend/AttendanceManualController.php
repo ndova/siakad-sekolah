@@ -104,6 +104,11 @@ class AttendanceManualController extends Controller
 
     public function pegawaiForm(Request $request)
     {
+        // Guru tidak boleh akses absensi pegawai
+        if (auth()->user()->role === 'guru') {
+            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
         $tanggal = $request->get('tanggal', now()->format('Y-m-d'));
         $jabatan = $request->get('jabatan');
 
@@ -135,6 +140,10 @@ class AttendanceManualController extends Controller
 
     public function pegawaiStore(Request $request)
     {
+        if (auth()->user()->role === 'guru') {
+            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
         $validated = $request->validate([
             'tanggal' => 'required|date',
             'status' => 'required|array',

@@ -382,9 +382,11 @@
             <a href="{{ url('/backend/attendance/siswa-manual') }}" class="sidebar-link {{ request()->is('backend/attendance/siswa*') ? 'active' : '' }}">
                 <i data-lucide="graduation-cap"></i> Input Siswa
             </a>
+            @unless(in_array(auth()->user()->role, ['guru']))
             <a href="{{ url('/backend/attendance/pegawai-manual') }}" class="sidebar-link {{ request()->is('backend/attendance/pegawai*') ? 'active' : '' }}">
                 <i data-lucide="clipboard-check"></i> Input Pegawai
             </a>
+            @endunless
 
             {{-- Fingerprint --}}
             @if(in_array(auth()->user()->role, ['superadmin', 'admin']))
