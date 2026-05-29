@@ -8,6 +8,7 @@ use App\Http\Controllers\Backend\ExamController;
 use App\Http\Controllers\Backend\FinanceController;
 use App\Http\Controllers\Backend\StaffController;
 use App\Http\Controllers\Backend\SettingsController;
+use App\Http\Controllers\Backend\BackupController;
 use App\Http\Controllers\Backend\DapodikController;
 use App\Http\Controllers\Backend\AttendanceManualController;
 use App\Http\Controllers\Backend\FingerprintController;
@@ -220,5 +221,18 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
             Route::get('/dapodik/mappings', [DapodikController::class, 'mappings'])->name('dapodik.mappings');
             Route::post('/dapodik/mappings', [DapodikController::class, 'updateMapping'])->name('dapodik.mappings.update');
             Route::get('/dapodik/logs', [DapodikController::class, 'logs'])->name('dapodik.logs');
+
+            // Backup & Restore
+            Route::prefix('system')->group(function () {
+                Route::get('/backup', [BackupController::class, 'index'])->name('system.backup');
+                Route::post('/backup/create', [BackupController::class, 'create'])->name('system.backup.create');
+                Route::get('/backup/download/{filename}', [BackupController::class, 'download'])
+                    ->where('filename', '.*')
+                    ->name('system.backup.download');
+                Route::post('/backup/restore', [BackupController::class, 'restore'])->name('system.backup.restore');
+                Route::post('/backup/restore-upload', [BackupController::class, 'restoreUpload'])->name('system.backup.restore-upload');
+                Route::post('/backup/delete', [BackupController::class, 'delete'])->name('system.backup.delete');
+                Route::post('/backup/settings', [BackupController::class, 'settings'])->name('system.backup.settings');
+            });
         });
     });

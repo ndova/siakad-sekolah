@@ -426,6 +426,11 @@
             <a href="{{ url('/backend/dapodik/logs') }}" class="sidebar-link {{ request()->is('backend/dapodik/logs*') ? 'active' : '' }}">
                 <i data-lucide="scroll-text"></i> Log Sinkronisasi
             </a>
+
+            <div class="sidebar-section">Sistem</div>
+            <a href="{{ url('/backend/system/backup') }}" class="sidebar-link {{ request()->is('backend/system/backup*') ? 'active' : '' }}">
+                <i data-lucide="hard-drive"></i> Backup & Restore
+            </a>
             @endif
             </nav>
 

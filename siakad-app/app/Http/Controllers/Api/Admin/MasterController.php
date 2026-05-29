@@ -335,7 +335,7 @@ class MasterController extends Controller
             'phone' => 'sometimes|nullable|string|max:20',
             'nama_ayah' => 'sometimes|nullable|string|max:200',
             'nama_ibu' => 'sometimes|nullable|string|max:200',
-            'status' => 'sometimes|in:aktif,lulus,pindah,keluar',
+            'status' => 'sometimes|in:aktif,tidak_aktif,lulus,pindah,keluar',
             'email' => ['nullable','email', Rule::unique('users')->ignore($student->user_id)],
             'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
@@ -401,14 +401,21 @@ class MasterController extends Controller
     }
 
     /**
-     * Hapus siswa (soft delete, ubah status ke keluar)
+     * Hapus siswa (hard delete, termasuk akun user)
      */
     public function destroyStudent(Student $student): JsonResponse
     {
-        $student->update(['status' => 'keluar']);
+        // Hapus akun user terkait jika ada
+        if ($student->user_id) {
+            \App\Models\User::where('id', $student->user_id)->delete();
+        }
+
+        // Hapus data siswa
+        $student->delete();
+
         return response()->json([
             'success' => true,
-            'message' => 'Siswa berhasil dikeluarkan',
+            'message' => 'Siswa berhasil dihapus',
         ]);
     }
 }

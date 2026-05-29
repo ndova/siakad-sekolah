@@ -65,14 +65,14 @@ class MasterController extends Controller
             'alamat'    => 'nullable|string',
             'class_id'  => 'nullable|exists:classes,id',
             'photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            // Data orang tua / wali (jika role=orang_tua)
-            'guardian_nama'     => 'required_if:role,orang_tua|string|max:200',
-            'guardian_jk'       => 'required_if:role,orang_tua|in:L,P',
-            'guardian_hubungan' => 'required_if:role,orang_tua|string|max:50',
-            'guardian_pekerjaan' => 'nullable|string|max:100',
-            'guardian_phone'    => 'nullable|string|max:20',
-            'guardian_alamat'   => 'nullable|string',
-            'student_id'        => 'nullable|exists:students,id',
+            // Data orang tua / wali (hanya jika role=orang_tua)
+            'guardian_nama'     => 'exclude_unless:role,orang_tua|required|string|max:200',
+            'guardian_jk'       => 'exclude_unless:role,orang_tua|required|in:L,P',
+            'guardian_hubungan' => 'exclude_unless:role,orang_tua|required|string|max:50',
+            'guardian_pekerjaan' => 'exclude_unless:role,orang_tua|nullable|string|max:100',
+            'guardian_phone'    => 'exclude_unless:role,orang_tua|nullable|string|max:20',
+            'guardian_alamat'   => 'exclude_unless:role,orang_tua|nullable|string',
+            'student_id'        => 'exclude_unless:role,orang_tua|nullable|exists:students,id',
             // Data guru (jika role=guru)
             'subject_ids' => 'nullable|array',
             'subject_ids.*' => 'exists:subjects,id',
@@ -113,7 +113,7 @@ class MasterController extends Controller
         if ($data['role'] === 'orang_tua') {
             $guardian = Guardian::create([
                 'user_id'      => $user->id,
-                'nama_lengkap' => $request->guardian_nama,
+                'nama_lengkap' => $request->guardian_nama ?: $request->name,
                 'jk'           => $request->guardian_jk ?? 'L',
                 'hubungan'     => $request->guardian_hubungan ?: 'Wali',
                 'pekerjaan'    => $request->guardian_pekerjaan,
@@ -144,11 +144,10 @@ class MasterController extends Controller
                 : SchoolClass::where('school_id', $this->schoolId())->where('is_active', true)->pluck('id')->toArray();
             foreach ($subjectIds as $subjectId) {
                 foreach ($classIds as $classId) {
-                    ClassSubject::firstOrCreate([
-                        'class_id' => $classId,
-                        'subject_id' => $subjectId,
-                        'teacher_id' => $user->id,
-                    ]);
+                    ClassSubject::updateOrCreate(
+                        ['class_id' => $classId, 'subject_id' => $subjectId],
+                        ['teacher_id' => $user->id]
+                    );
                 }
             }
         }
@@ -223,11 +222,10 @@ class MasterController extends Controller
                 ->where('is_active', true)->pluck('id');
             foreach ($subjectIds as $subjectId) {
                 foreach ($activeClasses as $classId) {
-                    ClassSubject::firstOrCreate([
-                        'class_id' => $classId,
-                        'subject_id' => $subjectId,
-                        'teacher_id' => $user->id,
-                    ]);
+                    ClassSubject::updateOrCreate(
+                        ['class_id' => $classId, 'subject_id' => $subjectId],
+                        ['teacher_id' => $user->id]
+                    );
                 }
             }
         }
@@ -395,7 +393,10 @@ class MasterController extends Controller
             $classes = SchoolClass::where('school_id', $this->schoolId())->where('is_active',true)->orderBy('code')->get();
         }
 
-        return view('backend.master.students', compact('students','classes', 'perPage'));
+        // Daftar status untuk dropdown filter
+        $statuses = ['aktif' => 'Aktif', 'tidak_aktif' => 'Tidak Aktif', 'lulus' => 'Lulus', 'keluar' => 'Keluar'];
+
+        return view('backend.master.students', compact('students','classes', 'perPage', 'statuses'));
     }
 
     public function storeStudent(Request $request)
@@ -417,7 +418,7 @@ class MasterController extends Controller
             'photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
         $data['school_id'] = $this->schoolId();
-        $data['status'] = 'aktif';
+        $data['status'] = $request->status ?? 'aktif';
 
         // Upload foto → users table via user_id
         $photoPath = null;
@@ -450,7 +451,7 @@ class MasterController extends Controller
             'nama_ayah' => 'nullable|string|max:200',
             'nama_ibu'  => 'nullable|string|max:200',
             'class_id'  => 'nullable|exists:classes,id',
-            'status'    => 'required|in:aktif,lulus,pindah,keluar',
+            'status'    => 'required|in:aktif,tidak_aktif,lulus,pindah,keluar',
             'photo'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
         $student->update($data);
@@ -470,8 +471,15 @@ class MasterController extends Controller
 
     public function deleteStudent(Student $student)
     {
-        $student->update(['status' => 'keluar']);
-        return back()->with('success', 'Siswa dikeluarkan.');
+        // Hapus akun user terkait jika ada
+        if ($student->user_id) {
+            User::where('id', $student->user_id)->delete();
+        }
+
+        // Hapus data siswa
+        $student->delete();
+
+        return back()->with('success', 'Siswa berhasil dihapus.');
     }
 
     public function showStudent(Student $student)
@@ -598,11 +606,10 @@ class MasterController extends Controller
         if (!empty($subjectIds) && !empty($classIds)) {
             foreach ($subjectIds as $subjectId) {
                 foreach ($classIds as $classId) {
-                    ClassSubject::create([
-                        'class_id'   => $classId,
-                        'subject_id' => $subjectId,
-                        'teacher_id' => $user->id,
-                    ]);
+                    ClassSubject::updateOrCreate(
+                        ['class_id' => $classId, 'subject_id' => $subjectId],
+                        ['teacher_id' => $user->id]
+                    );
                 }
             }
         }

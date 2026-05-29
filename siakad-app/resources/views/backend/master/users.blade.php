@@ -282,11 +282,8 @@
             </div>
             {{-- Fields khusus Orang Tua / Wali --}}
             <div id="guardianSection" style="display:none;">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Nama Lengkap <span class="text-red-400">*</span></label>
-                    <input type="text" name="guardian_nama" id="guardianNama" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
-                </div>
-                <div class="grid grid-cols-2 gap-3 pt-1">
+                <input type="hidden" name="guardian_nama" id="guardianNama" value="">
+                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1.5">Jenis Kelamin <span class="text-red-400">*</span></label>
                         <select name="guardian_jk" id="guardianJk" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-accent-200">
@@ -359,6 +356,10 @@ function toggleRoleFields() {
     document.getElementById('subjectSection').style.display = (role === 'guru') ? 'block' : 'none';
     document.getElementById('studentSection').style.display = (role === 'siswa') ? 'block' : 'none';
     document.getElementById('guardianSection').style.display = (role === 'orang_tua') ? 'block' : 'none';
+    // Auto-fill guardian_nama dari field Nama Lengkap utama
+    if (role === 'orang_tua') {
+        document.getElementById('guardianNama').value = document.getElementById('inputName').value;
+    }
 }
 function openModal() {
     document.getElementById('modalTitle').textContent = 'Tambah User';
