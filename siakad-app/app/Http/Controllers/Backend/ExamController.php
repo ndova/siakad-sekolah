@@ -426,19 +426,32 @@ class ExamController extends Controller
                 }
             }
 
-            // Update ExamResult totals setelah re-grade
+            // Update ExamResult totals setelah re-grade — pakai persentase
             $allSessions = ExamSession::where('exam_id', $examId)->where('status', 'finished')->pluck('id');
+            $examObj = Exam::find($examId);
+            $kkmScore = $examObj->minimum_score ?? 70;
+
+            // Hitung skor maksimal riil (jumlah semua soal × bobot)
+            $maxPossibleScore = \App\Models\ExamQuestion::where('exam_id', $examId)
+                ->with('question')
+                ->get()
+                ->sum(fn($eq) => $eq->score_override ?? $eq->question->score ?? 10);
+
             foreach ($allSessions as $sid) {
                 $answers = ExamAnswer::where('exam_session_id', $sid)->get();
-                $totalScore = $answers->sum('score') ?? 0;
+                $rawScore = $answers->sum('score') ?? 0;
                 $correctCount = $answers->where('is_correct', true)->count();
-                $examObj = Exam::find($examId);
-                $kkm = $examObj->minimum_score ?? ($examObj->total_score * 0.7);
+
+                // Nilai akhir = persentase dari skor maksimal
+                $finalScore = $maxPossibleScore > 0
+                    ? round(($rawScore / $maxPossibleScore) * 100, 1)
+                    : 0;
+
                 ExamResult::where('exam_session_id', $sid)->update([
-                    'total_score' => $totalScore,
+                    'total_score' => $finalScore,
                     'correct_count' => $correctCount,
                     'wrong_count' => $answers->where('is_correct', false)->count(),
-                    'is_passed' => $totalScore >= $kkm,
+                    'is_passed' => $finalScore >= $kkmScore,
                 ]);
             }
 

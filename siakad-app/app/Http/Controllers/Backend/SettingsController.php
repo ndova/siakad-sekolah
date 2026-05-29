@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ExportDapodikJob;
 use App\Models\School;
+use App\Models\SchoolClass;
+use App\Models\Semester;
+use App\Services\Dapodik\DapodikClient;
 use App\Services\SchoolService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -92,14 +96,70 @@ class SettingsController extends Controller
             $validated['landing_image'] = $request->file('landing_image')->store('school', 'public');
         }
 
+        // Deteksi NPSN baru atau berubah
+        $oldNpsn = $school->npsn;
+        $newNpsn = $validated['npsn'] ?? null;
+        $npsnChanged = $oldNpsn !== $newNpsn;
+
+        // Jika NPSN diisi/berubah, coba lookup data sekolah dari Dapodik
+        $dapodikData = null;
+        if ($npsnChanged && $newNpsn) {
+            $dapodik = new DapodikClient();
+            $dapodikData = $dapodik->lookupSchool($newNpsn);
+
+            // Auto-fill data sekolah yang masih kosong dari hasil lookup Dapodik
+            if ($dapodikData) {
+                $validated = array_merge($validated, array_filter($dapodikData, fn($v) => !is_null($v)));
+            }
+        }
+
         $school->fill($validated);
         $school->is_active = true;
         $school->save();
 
         SchoolService::clearCache();
 
+        // Auto-sync ke Dapodik jika NPSN baru diisi atau diubah
+        if ($npsnChanged && $newNpsn) {
+            $this->dispatchDapodikSync($school->id);
+        }
+
+        $msg = 'Pengaturan sekolah berhasil disimpan.';
+        if ($dapodikData) {
+            $filledFields = array_keys(array_filter($dapodikData));
+            $msg .= ' Data sekolah (' . implode(', ', $filledFields) . ') berhasil dilengkapi dari Dapodik.';
+        }
+        if ($npsnChanged && $newNpsn) {
+            $msg .= ' Sinkronisasi data ke Dapodik sedang diproses.';
+        }
+
         return redirect()->route('backend.settings.edit')
-            ->with('success', 'Pengaturan sekolah berhasil disimpan.');
+            ->with('success', $msg);
+    }
+
+    /**
+     * Dispatch Dapodik export jobs untuk seluruh data sekolah.
+     */
+    protected function dispatchDapodikSync(string $schoolId): void
+    {
+        $classIds = SchoolClass::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->pluck('id');
+
+        if ($classIds->isEmpty()) return;
+
+        $semesterId = Semester::whereHas('academicYear',
+            fn($q) => $q->where('school_id', $schoolId)
+        )->where('is_active', true)->value('id');
+
+        if (!$semesterId) return;
+
+        $userId = auth()->id();
+
+        // Export 3 tipe entitas ke Dapodik
+        ExportDapodikJob::dispatch('student', $classIds, $semesterId, $userId);
+        ExportDapodikJob::dispatch('teacher', $classIds, $semesterId, $userId);
+        ExportDapodikJob::dispatch('grade',   $classIds, $semesterId, $userId);
     }
 
     /**

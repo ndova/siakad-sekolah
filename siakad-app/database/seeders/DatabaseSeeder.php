@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             P4_DataSeeder::class,
             P5_PortalDataSeeder::class,
             P6_DapodikKurmerSeeder::class,
+            ClassSubjectSeeder::class,
         ]);
 
         DB::statement('PRAGMA foreign_keys = ON');

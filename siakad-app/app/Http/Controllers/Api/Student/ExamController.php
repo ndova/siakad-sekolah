@@ -273,7 +273,7 @@ class ExamController extends Controller
 
             $isCorrect = $selectedVal !== null && $selectedVal === $correctVal;
 
-            $maxScore = $examQuestion->score_override ?? $question->score;
+            $maxScore = $examQuestion->score_override ?? $question->score ?? 10;
             $score = $isCorrect ? $maxScore : 0;
         } elseif ($question->type === 'jodoh') {
             // Jodoh: options = {kiri1:kanan1, kiri2:kanan2, ...}
@@ -293,9 +293,8 @@ class ExamController extends Controller
             }
 
             $isCorrect = $totalPairs > 0 && $correctCount === $totalPairs;
-            $maxScore = $examQuestion->score_override ?? $question->score;
+            $maxScore = $examQuestion->score_override ?? $question->score ?? 10;
             $score = $totalPairs > 0 ? round(($correctCount / $totalPairs) * $maxScore, 1) : 0;
-            $score = $isCorrect ? $maxScore : 0;
         }
 
         // Upsert answer
@@ -433,8 +432,20 @@ class ExamController extends Controller
             $wrongCount = $answers->where('is_correct', false)->count();
             $totalScore = $answers->sum('score') ?? 0;
 
-            // KKM
-            $kkm = $exam->minimum_score ?? ($exam->total_score * 0.7);
+            // Hitung skor maksimal riil (jumlah semua soal × bobot masing-masing)
+            $maxPossibleScore = ExamQuestion::where('exam_id', $exam->id)
+                ->with('question')
+                ->get()
+                ->sum(fn($eq) => $eq->score_override ?? $eq->question->score ?? 10);
+
+            // KKM: gunakan minimum_score jika diset, atau 70 sebagai default
+            $kkmScore = $exam->minimum_score ?? 70;
+
+            // Nilai akhir = persentase dari skor maksimal × 100
+            $finalScore = $maxPossibleScore > 0
+                ? round(($totalScore / $maxPossibleScore) * 100, 1)
+                : 0;
+            $isPassed = $finalScore >= $kkmScore;
 
             // Buat / update ExamResult
             $result = ExamResult::updateOrCreate(
@@ -444,10 +455,10 @@ class ExamController extends Controller
                 [
                     'student_id' => $student->id,
                     'exam_id' => $exam->id,
-                    'total_score' => $totalScore,
+                    'total_score' => $finalScore,
                     'correct_count' => $correctCount,
                     'wrong_count' => $wrongCount,
-                    'is_passed' => $totalScore >= $kkm,
+                    'is_passed' => $isPassed,
                 ]
             );
 
@@ -479,12 +490,12 @@ class ExamController extends Controller
                 'success' => true,
                 'message' => 'Ujian selesai. ' . ($needsManualGrading ? 'Hasil akan diumumkan setelah dikoreksi guru.' : ''),
                 'data' => [
-                    'total_score' => $showResult ? $totalScore : null,
+                    'total_score' => $showResult ? $finalScore : null,
                     'correct_count' => $showResult ? $correctCount : null,
                     'wrong_count' => $showResult ? $wrongCount : null,
                     'total_questions' => $exam->total_questions,
-                    'is_passed' => $showResult ? $result->is_passed : null,
-                    'minimum_score' => $kkm,
+                    'is_passed' => $showResult ? $isPassed : null,
+                    'minimum_score' => $kkmScore,
                     'show_result' => $showResult,
                     'needs_grading' => $needsManualGrading,
                 ],

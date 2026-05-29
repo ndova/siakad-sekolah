@@ -1,5 +1,20 @@
 @extends('layouts.backend')
 @section('title', 'Grid Absensi Pegawai — SIAKAD')
+
+@push('styles')
+<style>
+.modal-content {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    width: 100%;
+    position: relative;
+    z-index: 51;
+}
+</style>
+@endpush
+
 @section('content')
 <div class="max-w-full mx-auto">
     <div class="mb-6 flex flex-wrap justify-between items-center gap-3">
@@ -87,8 +102,8 @@
         <div class="overflow-x-auto">
             <table class="w-full text-xs border-collapse">
                 <thead>
-                    <tr class="bg-slate-50 sticky top-0 z-10">
-                        <th class="sticky left-0 bg-slate-50 px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase min-w-[160px] z-20">
+                    <tr class="bg-slate-50 sticky top-0 z-20">
+                        <th class="sticky left-0 bg-slate-50 px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase min-w-[160px] z-30">
                             Pegawai / Jabatan
                         </th>
                         @foreach($dates as $date)
@@ -119,7 +134,7 @@
                         $hadirCount = 0; $terlambatCount = 0; $izinCount = 0; $sakitCount = 0; $alfaCount = 0;
                     @endphp
                     <tr class="hover:bg-slate-50/30">
-                        <td class="sticky left-0 bg-white px-3 py-2 border-r border-slate-50 z-10">
+                        <td class="sticky left-0 bg-white px-3 py-2 border-r border-slate-100 z-[1]">
                             <div class="font-medium text-slate-800 truncate max-w-[150px]">{{ $staff->nama_lengkap }}</div>
                             <div class="text-[10px] text-slate-400">{{ $staff->nip }}</div>
                         </td>
@@ -183,25 +198,21 @@
             <input type="hidden" name="tanggal" id="attTanggal">
             <div class="grid grid-cols-3 gap-1.5" id="attStatusOptions">
                 @foreach(['hadir'=>'Hadir','terlambat'=>'Terlambat','izin'=>'Izin','sakit'=>'Sakit','alfa'=>'Alfa'] as $val => $label)
-                <label class="cursor-pointer">
-                    <input type="radio" name="status" value="{{ $val }}" class="sr-only peer">
-                    <div class="text-center py-2 rounded-lg border text-xs font-medium transition-all peer-checked:ring-2 peer-checked:ring-accent-200 {{ 
-                        $val === 'hadir' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 peer-checked:bg-emerald-200' :
-                        ($val === 'terlambat' ? 'border-yellow-200 bg-yellow-50 text-yellow-700 peer-checked:bg-yellow-200' :
-                        ($val === 'izin' ? 'border-blue-200 bg-blue-50 text-blue-700 peer-checked:bg-blue-200' :
-                        ($val === 'sakit' ? 'border-orange-200 bg-orange-50 text-orange-700 peer-checked:bg-orange-200' :
-                        'border-red-200 bg-red-50 text-red-700 peer-checked:bg-red-200')))
+                <button type="button"
+                    onclick="submitAttendance('{{ $val }}')"
+                    class="text-center py-2.5 rounded-lg border text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer {{ 
+                        $val === 'hadir' ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-200' :
+                        ($val === 'terlambat' ? 'border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-200' :
+                        ($val === 'izin' ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-200' :
+                        ($val === 'sakit' ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-200' :
+                        'border-red-300 bg-red-50 text-red-700 hover:bg-red-200')))
                     }}">
-                        {{ $label }}
-                    </div>
-                </label>
+                    {{ $label }}
+                </button>
                 @endforeach
             </div>
-            <input name="keterangan" placeholder="Keterangan (opsional)" class="form-input text-xs w-full">
-            <div class="flex gap-2 pt-1">
-                <button type="button" onclick="closeAttModal()" class="btn-secondary text-xs px-3 py-1.5 rounded-lg flex-1">Batal</button>
-                <button class="btn-primary text-xs px-3 py-1.5 rounded-lg flex-1">Simpan</button>
-            </div>
+            <input name="keterangan" id="attKeterangan" placeholder="Keterangan (opsional)" class="form-input text-xs w-full border border-slate-300 rounded-lg py-2.5 px-3 focus:border-accent focus:ring-1 focus:ring-accent-200">
+            <button type="button" onclick="closeAttModal()" class="w-full text-center text-xs text-slate-400 hover:text-slate-600 pt-1">Batal</button>
         </form>
     </div>
 </div>
@@ -209,19 +220,35 @@
 
 @push('scripts')
 <script>
+const STATUS_LABELS = {
+    hadir: 'Hadir', terlambat: 'Terlambat', izin: 'Izin', sakit: 'Sakit', alfa: 'Alfa'
+};
+
 function setAttendance(staffId, tanggal, currentStatus) {
     document.getElementById('attStaffId').value = staffId;
     document.getElementById('attTanggal').value = tanggal;
-    document.getElementById('attDateLabel').textContent = 'Tanggal: ' + tanggal + (currentStatus ? ' (saat ini: ' + '{{ \App\Models\StaffAttendance::statusLabel("") }}'.replace('Belum', currentStatus) + ')' : '');
-    // Reset form
-    document.querySelectorAll('#attStatusOptions input').forEach(el => el.checked = false);
-    document.getElementById('attForm').querySelector('[name=keterangan]').value = '';
-    document.getElementById('attModal').classList.remove('hidden');
+    var statusText = currentStatus ? ' (saat ini: ' + (STATUS_LABELS[currentStatus] || currentStatus) + ')' : '';
+    document.getElementById('attDateLabel').textContent = 'Tanggal: ' + tanggal + statusText;
+    document.getElementById('attKeterangan').value = '';
+    document.getElementById('attModal').classList.add('show');
     document.body.style.overflow = 'hidden';
 }
 
+function submitAttendance(status) {
+    // Set status ke hidden input lalu submit form
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'status';
+    input.value = status;
+    var form = document.getElementById('attForm');
+    // Remove old status input if any
+    form.querySelectorAll('input[name=status]').forEach(el => el.remove());
+    form.appendChild(input);
+    form.submit();
+}
+
 function closeAttModal() {
-    document.getElementById('attModal').classList.add('hidden');
+    document.getElementById('attModal').classList.remove('show');
     document.body.style.overflow = '';
 }
 
@@ -229,20 +256,16 @@ function bulkFill() {
     const status = document.getElementById('bulkStatus').value;
     const tanggal = document.querySelector('#bulkForm [name=tanggal]').value;
     if (!tanggal) return;
-    showConfirm('Isi semua pegawai dengan status "' + status + '" untuk tanggal ' + tanggal + '?', 'Isi Massal', 'Ya, Isi', function() {
-        document.querySelectorAll('#bulkForm .bulk-status-select').forEach(function(sel) { sel.value = status; });
+    showConfirm('Isi semua pegawai dengan status "' + (STATUS_LABELS[status] || status) + '" untuk tanggal ' + tanggal + '?', 'Isi Massal', 'Ya, Isi', function() {
+        var form = document.getElementById('bulkForm');
+        form.querySelectorAll('input[name^="records"]').forEach(el => el.remove());
+        @foreach($staffList as $staff)
+        form.insertAdjacentHTML('beforeend', 
+            '<input type="hidden" name="records[{{ $loop->index }}][staff_id]" value="{{ $staff->id }}">' +
+            '<input type="hidden" name="records[{{ $loop->index }}][status]" value="' + status + '">');
+        @endforeach
+        form.submit();
     });
-    
-    const form = document.getElementById('bulkForm');
-    // Remove old records
-    form.querySelectorAll('input[name^="records"]').forEach(el => el.remove());
-    
-    @foreach($staffList as $staff)
-    form.insertAdjacentHTML('beforeend', 
-        '<input type="hidden" name="records[{{ $loop->index }}][staff_id]" value="{{ $staff->id }}">' +
-        '<input type="hidden" name="records[{{ $loop->index }}][status]" value="' + status + '">');
-    @endforeach
-    form.submit();
 }
 </script>
 @endpush

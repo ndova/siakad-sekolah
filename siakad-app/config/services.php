@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'dapodik' => [
+        'base_url' => env('DAPODIK_API_BASE_URL'),
+        'api_key'  => env('DAPODIK_API_KEY'),
+    ],
+
 ];

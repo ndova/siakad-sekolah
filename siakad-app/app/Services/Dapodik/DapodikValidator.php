@@ -18,16 +18,14 @@ class DapodikValidator
     public static function validateRombelBebanJam(SchoolClass $class, Semester $semester): array
     {
         $errors = [];
-        $totalJP = $class->lessonHours()
+        $totalJP = $class->classSubjects()
             ->where('semester_id', $semester->id)
             ->sum('jam_per_minggu');
 
         $pklJP = $class->classSubjects()
             ->where('semester_id', $semester->id)
             ->whereHas('subject', fn($q) => $q->where('is_pkl', true))
-            ->with('subject')
-            ->get()
-            ->sum(fn($cs) => $cs->jam_per_minggu ?? 0);
+            ->sum('jam_per_minggu');
 
         $batasMin = 42;
         $batasMax = 46;

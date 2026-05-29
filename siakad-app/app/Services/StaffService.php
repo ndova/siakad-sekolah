@@ -96,40 +96,57 @@ class StaffService
 
     public function storeAttendance(array $data): void
     {
-        StaffAttendance::updateOrCreate(
-            ['staff_id' => $data['staff_id'], 'tanggal' => $data['tanggal']],
+        DB::table('staff_attendances')->upsert(
             [
-                'id'             => Str::uuid(),
-                'school_id'      => $this->schoolId,
-                'status'         => $data['status'],
-                'check_in_time'  => $data['check_in_time'] ?? null,
-                'check_out_time' => $data['check_out_time'] ?? null,
-                'keterangan'     => $data['keterangan'] ?? null,
-                'source'         => $data['source'] ?? 'manual',
-                'created_by'     => auth()->id(),
-            ]
+                [
+                    'id'             => (string) Str::uuid(),
+                    'staff_id'       => $data['staff_id'],
+                    'tanggal'        => $data['tanggal'],
+                    'school_id'      => $this->schoolId,
+                    'status'         => $data['status'],
+                    'check_in_time'  => $data['check_in_time'] ?? null,
+                    'check_out_time' => $data['check_out_time'] ?? null,
+                    'keterangan'     => $data['keterangan'] ?? null,
+                    'source'         => $data['source'] ?? 'manual',
+                    'created_by'     => auth()->id(),
+                    'created_at'     => now()->toDateTimeString(),
+                    'updated_at'     => now()->toDateTimeString(),
+                ],
+            ],
+            ['staff_id', 'tanggal'],
+            ['status', 'check_in_time', 'check_out_time', 'keterangan', 'source', 'updated_at']
         );
     }
 
     public function bulkStoreAttendance(string $tanggal, array $records): void
     {
-        DB::transaction(function () use ($tanggal, $records) {
-            foreach ($records as $record) {
-                if (empty($record['status'])) continue;
+        $rows = [];
+        $now  = now()->toDateTimeString();
 
-                StaffAttendance::updateOrCreate(
-                    ['staff_id' => $record['staff_id'], 'tanggal' => $tanggal],
-                    [
-                        'id'         => Str::uuid(),
-                        'school_id'  => $this->schoolId,
-                        'status'     => $record['status'],
-                        'keterangan' => $record['keterangan'] ?? null,
-                        'source'     => 'manual',
-                        'created_by' => auth()->id(),
-                    ]
-                );
-            }
-        });
+        foreach ($records as $record) {
+            if (empty($record['status'])) continue;
+
+            $rows[] = [
+                'id'         => (string) Str::uuid(),
+                'staff_id'   => $record['staff_id'],
+                'tanggal'    => $tanggal,
+                'school_id'  => $this->schoolId,
+                'status'     => $record['status'],
+                'keterangan' => $record['keterangan'] ?? null,
+                'source'     => 'manual',
+                'created_by' => auth()->id(),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (empty($rows)) return;
+
+        DB::table('staff_attendances')->upsert(
+            $rows,
+            ['staff_id', 'tanggal'],                                      // unique keys
+            ['status', 'keterangan', 'source', 'updated_at', 'created_by'] // columns to update on conflict
+        );
     }
 
     // ─── Recap ──────────────────────────────────────────────────
