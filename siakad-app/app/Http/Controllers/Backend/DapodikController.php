@@ -145,6 +145,23 @@ class DapodikController extends Controller
         return view('backend.dapodik.logs', compact('logs'));
     }
 
+    public function deleteLog($id)
+    {
+        $log = SyncLog::findOrFail($id);
+        $log->delete();
+
+        return redirect()->route('dapodik.logs')
+            ->with('success', 'Log sinkronisasi berhasil dihapus.');
+    }
+
+    public function clearLogs()
+    {
+        SyncLog::truncate();
+
+        return redirect()->route('dapodik.logs')
+            ->with('success', 'Semua log sinkronisasi berhasil dihapus.');
+    }
+
     // ─── HELPER ─────────────────────────────────────────────
 
     protected function schoolId(): string

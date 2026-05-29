@@ -8,9 +8,21 @@
     <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div class="p-5 border-b flex justify-between items-center">
             <h3 class="font-semibold text-slate-800">Riwayat Sinkronisasi</h3>
-            <a href="{{ route('dapodik.index') }}" class="text-sm text-indigo-600 hover:underline">
-                ← Kembali ke Integrasi
-            </a>
+            <div class="flex items-center gap-3">
+                @if($logs->isNotEmpty())
+                <form method="POST" action="{{ route('dapodik.logs.clear') }}"
+                    onsubmit="event.preventDefault(); showConfirm('Hapus semua log sinkronisasi? Tindakan ini tidak dapat dibatalkan.', 'Hapus Semua Log', 'Ya, Hapus Semua', () => this.submit());"
+                    class="inline">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus Semua
+                    </button>
+                </form>
+                @endif
+                <a href="{{ route('dapodik.index') }}" class="text-sm text-indigo-600 hover:underline">
+                    ← Kembali ke Integrasi
+                </a>
+            </div>
         </div>
 
         @if($logs->isEmpty())
@@ -28,6 +40,7 @@
                         <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Waktu Mulai</th>
                         <th class="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Selesai</th>
                         <th class="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">File</th>
+                        <th class="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
@@ -60,6 +73,16 @@
                             @else
                             <span class="text-xs text-slate-300">—</span>
                             @endif
+                        </td>
+                        <td class="py-3 px-4 text-center">
+                            <form method="POST" action="{{ route('dapodik.logs.delete', $log->id) }}"
+                                onsubmit="event.preventDefault(); showConfirm('Hapus log sinkronisasi ini?', 'Hapus Log', 'Ya, Hapus', () => this.submit());"
+                                class="inline">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600" title="Hapus">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     @endforeach

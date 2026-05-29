@@ -58,6 +58,14 @@ class Exam extends Model
         return SchoolClass::whereIn('id', $ids)->get();
     }
 
+    /** Apakah ujian ini punya soal esai atau jodoh (butuh koreksi manual guru) */
+    public function hasManualTypes(): bool
+    {
+        return ExamQuestion::where('exam_id', $this->id)
+            ->whereHas('question', fn($q) => $q->whereIn('type', ['esai', 'jodoh']))
+            ->exists();
+    }
+
     /** Comma-separated class codes untuk ditampilkan di daftar */
     public function getClassCodesAttribute(): string
     {

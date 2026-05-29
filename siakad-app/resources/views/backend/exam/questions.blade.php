@@ -146,6 +146,10 @@
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">TP</label><select name="learning_objective_id" class="w-full px-3 py-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-accent-200"><option value="">-</option>@foreach($learningObjectives as $lo)<option value="{{ $lo->id }}">{{ $lo->code }}</option>@endforeach</select></div>
         <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Skor</label><input name="score" type="number" min="0" max="100" value="1" class="w-full px-3 py-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-accent-200"></div>
     </div>
+    <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Level Kognitif</label><select name="level_kognitif" class="w-full px-3 py-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-accent-200"><option value="">-</option><option value="L1">L1 - Pengetahuan</option><option value="L2">L2 - Aplikasi</option><option value="L3">L3 - Penalaran</option></select></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tingkat Kesulitan</label><select name="difficulty" class="w-full px-3 py-2.5 rounded-xl border text-xs focus:ring-2 focus:ring-accent-200"><option value="mudah">Mudah</option><option value="sedang" selected>Sedang</option><option value="sulit">Sulit</option></select></div>
+    </div>
     <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tipe</label><select name="type" id="qType" onchange="toggleOptions()" class="w-full px-4 py-2.5 rounded-xl border text-sm focus:ring-2 focus:ring-accent-200">
         <option value="pg">Pilihan Ganda</option>
         <option value="bs">Benar / Salah</option>
@@ -189,7 +193,6 @@
         <div class="mt-2" id="answerKeySection"><label class="block text-xs font-semibold text-slate-500 mb-1">Kunci Jawaban</label><select name="answer_key" class="px-3 py-2 rounded-lg border text-xs focus:ring-2 focus:ring-accent-200"><option value="">-</option>@foreach(['A','B','C','D','E'] as $l)<option value="{{ $l }}">{{ $l }}</option>@endforeach</select></div>
     </div>
     <input type="hidden" name="options" id="optionsJson" value="">
-    <input type="hidden" name="difficulty" value="sedang">
     <div class="flex gap-3 pt-2"><button class="flex-1 px-4 py-2.5 rounded-xl btn-accent text-white text-sm font-medium">Simpan</button><button type="button" onclick="closeMod()" class="px-4 py-2.5 rounded-xl border text-sm text-slate-600">Batal</button></div>
 </form></div></div>
 

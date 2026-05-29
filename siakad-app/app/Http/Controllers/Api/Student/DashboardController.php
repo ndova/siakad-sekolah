@@ -259,8 +259,10 @@ class DashboardController extends Controller
                     'total_score' => $exam->total_score,
                     'status' => $exam->status,
                     'session_status' => $session?->status,
-                    'my_score' => $result?->total_score !== null ? (float) $result->total_score : null,
-                    'is_passed' => $result?->is_passed,
+                    'my_score' => ($result && ($result->graded_at || !$exam->hasManualTypes())) ? (float) $result->total_score : null,
+                    'is_passed' => ($result && ($result->graded_at || !$exam->hasManualTypes())) ? $result->is_passed : null,
+                    'graded_at' => $result?->graded_at?->toISOString(),
+                    'needs_grading' => $exam->hasManualTypes(),
                 ];
             });
 
