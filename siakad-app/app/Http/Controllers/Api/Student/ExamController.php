@@ -479,7 +479,7 @@ class ExamController extends Controller
                 ->unique()
                 ->toArray();
 
-            $needsManualGrading = !empty(array_intersect($examQuestionTypes, ['esai']));
+            $needsManualGrading = !empty(array_intersect($examQuestionTypes, ['esai', 'jodoh']));
 
             // Jika butuh koreksi manual, jangan tampilkan skor dulu
             $showResult = $exam->show_result && !$needsManualGrading;

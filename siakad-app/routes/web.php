@@ -220,5 +220,7 @@ Route::middleware(['auth', 'role:' . implode(',', Role::internalRoles())])
             Route::get('/dapodik/mappings', [DapodikController::class, 'mappings'])->name('dapodik.mappings');
             Route::post('/dapodik/mappings', [DapodikController::class, 'updateMapping'])->name('dapodik.mappings.update');
             Route::get('/dapodik/logs', [DapodikController::class, 'logs'])->name('dapodik.logs');
+            Route::delete('/dapodik/logs/{id}', [DapodikController::class, 'deleteLog'])->name('dapodik.logs.delete');
+            Route::delete('/dapodik/logs', [DapodikController::class, 'clearLogs'])->name('dapodik.logs.clear');
         });
     });
