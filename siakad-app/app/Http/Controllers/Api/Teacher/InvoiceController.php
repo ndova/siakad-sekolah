@@ -45,7 +45,7 @@ class InvoiceController extends Controller
     {
         $user = $request->user();
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:fee_types,code',
+            'code' => ['required','string','max:50', Rule::unique('fee_types','code')],
             'name' => 'required|string|max:255',
             'category' => ['required', Rule::in(['spp', 'daftar_ulang', 'ujian', 'kegiatan', 'seragam', 'lainnya'])],
             'nominal' => 'required|numeric|min:0',

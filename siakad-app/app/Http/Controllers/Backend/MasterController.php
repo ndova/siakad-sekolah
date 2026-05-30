@@ -50,14 +50,14 @@ class MasterController extends Controller
     {
         $data = $request->validate([
             'name'     => 'required|string|max:200',
-            'email'    => 'required|email|unique:users,email',
+            'email'    => ['required','email', Rule::unique('users')],
             'password' => 'required|min:6',
             'role'     => 'required|in:' . implode(',', \App\Enums\Role::allValues()),
             'nip'      => 'nullable|string|max:30',
             'phone'    => 'nullable|string|max:20',
             // Data siswa (jika role=siswa)
             'nis'      => 'required_if:role,siswa|string|max:20',
-            'nisn'     => 'required_if:role,siswa|string|max:10|unique:students,nisn',
+            'nisn'     => ['required_if:role,siswa','string','max:10', Rule::unique('students','nisn')->where('status','aktif')->whereNull('deleted_at')],
             'jk'       => 'nullable|in:L,P',
             'tempat_lahir'   => 'nullable|string|max:100',
             'tanggal_lahir'  => 'nullable|date',
@@ -236,6 +236,30 @@ class MasterController extends Controller
     public function deleteUser(User $user)
     {
         if ($user->school_id !== $this->schoolId()) abort(403);
+
+        // Hapus relasi terkait sebelum menghapus user (mencegah FK constraint)
+        $user->classSubjectsAsTeacher()->delete();
+        $user->notifications()->delete();
+        $user->createdGrades()->delete();
+        $user->createdQuestions()->delete();
+        $user->createdExams()->delete();
+        $user->verifiedPayments()->delete();
+        $user->createdInvoices()->delete();
+        $user->createdQuestionBanks()->delete();
+        $user->createdP5Projects()->delete();
+        $user->createdP5Assessments()->delete();
+        $user->createdAttendances()->delete();
+        $user->teacherAssignments()->delete();
+
+        if ($user->student)      $user->student()->delete();
+        if ($user->guardian)     $user->guardian()->delete();
+        if ($user->staff)        $user->staff()->delete();
+
+        // Lepaskan relasi walikelas
+        if ($user->homeroomClass) {
+            $user->homeroomClass()->update(['wali_kelas_id' => null]);
+        }
+
         $user->delete();
         return back()->with('success', 'User berhasil dihapus.');
     }
@@ -402,7 +426,7 @@ class MasterController extends Controller
     public function storeStudent(Request $request)
     {
         $data = $request->validate([
-            'nisn'      => 'required|string|max:10|unique:students,nisn',
+            'nisn'      => ['required','string','max:10', Rule::unique('students','nisn')->where('status','aktif')->whereNull('deleted_at')],
             'nis'       => 'required|string|max:20',
             'nama_lengkap' => 'required|string|max:200',
             'jk'        => 'required|in:L,P',
@@ -439,7 +463,7 @@ class MasterController extends Controller
     public function updateStudent(Request $request, Student $student)
     {
         $data = $request->validate([
-            'nisn'      => ['required','string','max:10', Rule::unique('students')->ignore($student->id)],
+            'nisn'      => ['required','string','max:10', Rule::unique('students','nisn')->ignore($student->id)->where('status','aktif')->whereNull('deleted_at')],
             'nis'       => 'required|string|max:20',
             'nama_lengkap' => 'required|string|max:200',
             'jk'        => 'required|in:L,P',
@@ -471,9 +495,24 @@ class MasterController extends Controller
 
     public function deleteStudent(Student $student)
     {
-        // Hapus akun user terkait jika ada
+        // Hapus akun user terkait jika ada — beserta relasinya (cegah FK constraint)
         if ($student->user_id) {
-            User::where('id', $student->user_id)->delete();
+            $user = User::find($student->user_id);
+            if ($user) {
+                $user->notifications()->delete();
+                $user->classSubjectsAsTeacher()->delete();
+                $user->createdGrades()->delete();
+                $user->createdQuestions()->delete();
+                $user->createdExams()->delete();
+                $user->verifiedPayments()->delete();
+                $user->createdInvoices()->delete();
+                $user->createdQuestionBanks()->delete();
+                $user->createdP5Projects()->delete();
+                $user->createdP5Assessments()->delete();
+                $user->createdAttendances()->delete();
+                $user->teacherAssignments()->delete();
+                $user->delete();
+            }
         }
 
         // Hapus data siswa
@@ -655,7 +694,7 @@ class MasterController extends Controller
             'guardian_phone'     => 'nullable|string|max:20',
             'guardian_alamat'    => 'nullable|string',
             'student_id'         => 'nullable|exists:students,id',
-            'email'              => 'nullable|email|unique:users,email',
+            'email'              => ['nullable','email', Rule::unique('users')],
             'password'           => 'nullable|min:6',
         ]);
 
@@ -749,6 +788,16 @@ class MasterController extends Controller
     public function deleteGuardian(Guardian $guardian)
     {
         $guardian->students()->detach();
+
+        // Hapus juga user terkait
+        if ($guardian->user_id) {
+            $user = User::find($guardian->user_id);
+            if ($user) {
+                $user->notifications()->delete();
+                $user->delete();
+            }
+        }
+
         $guardian->delete();
         return back()->with('success', 'Data orang tua/wali berhasil dihapus.');
     }

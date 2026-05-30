@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -70,13 +71,13 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:200',
-            'email' => 'required|email|unique:users',
+            'email' => ['required','email', Rule::unique('users')],
             'password' => 'required|string|min:6',
             'role' => 'required|in:siswa,orang_tua',
             'school_id' => 'required_if:role,siswa|exists:schools,id',
             // Data profil siswa (opsional untuk ortu, dipakai jika role=siswa)
             'nis' => 'required_if:role,siswa|string|max:20',
-            'nisn' => 'required_if:role,siswa|string|max:10|unique:students,nisn',
+            'nisn' => ['required_if:role,siswa','string','max:10', Rule::unique('students','nisn')->where('status','aktif')->whereNull('deleted_at')],
             'jk' => 'required_if:role,siswa|in:L,P',
             'tempat_lahir' => 'nullable|string|max:100',
             'tanggal_lahir' => 'nullable|date',

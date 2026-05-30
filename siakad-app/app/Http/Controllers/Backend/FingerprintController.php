@@ -7,6 +7,7 @@ use App\Models\FingerprintDevice;
 use App\Models\FingerLog;
 use App\Services\FingerprintService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FingerprintController extends Controller
 {
@@ -33,7 +34,7 @@ class FingerprintController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:100',
-            'serial_number' => 'required|string|max:50|unique:fingerprint_devices',
+            'serial_number' => ['required','string','max:50', Rule::unique('fingerprint_devices')],
             'ip_address' => 'nullable|string|max:45',
             'port' => 'nullable|integer',
             'model' => 'nullable|string|max:50',

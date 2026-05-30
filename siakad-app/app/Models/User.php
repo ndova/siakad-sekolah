@@ -104,6 +104,32 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
+    // Audit / created_by
+    public function createdQuestionBanks(): HasMany
+    {
+        return $this->hasMany(QuestionBank::class, 'created_by');
+    }
+
+    public function createdP5Projects(): HasMany
+    {
+        return $this->hasMany(P5Project::class, 'created_by');
+    }
+
+    public function createdP5Assessments(): HasMany
+    {
+        return $this->hasMany(P5Assessment::class, 'created_by');
+    }
+
+    public function createdAttendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class, 'created_by');
+    }
+
+    public function teacherAssignments(): HasMany
+    {
+        return $this->hasMany(TeacherAssignment::class, 'user_id');
+    }
+
     // ─── Role Helpers ─────────────────────────────────────────
 
     public function isAdmin(): bool

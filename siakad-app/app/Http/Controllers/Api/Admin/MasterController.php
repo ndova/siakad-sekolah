@@ -231,9 +231,9 @@ class MasterController extends Controller
     {
         $validated = $request->validate([
             'name'      => 'required|string|max:200',
-            'email'     => 'required|email|unique:users,email',
+            'email'     => ['required','email', Rule::unique('users')],
             'password'  => 'required|string|min:6',
-            'nisn'      => 'required|string|max:10|unique:students,nisn',
+            'nisn'      => ['required','string','max:10', Rule::unique('students','nisn')->where('status','aktif')->whereNull('deleted_at')],
             'nis'       => 'required|string|max:20',
             'jk'        => 'required|in:L,P',
             'class_id'  => 'nullable|exists:classes,id',
@@ -324,7 +324,7 @@ class MasterController extends Controller
     {
         $validated = $request->validate([
             'nama_lengkap' => 'sometimes|string|max:200',
-            'nisn' => ['sometimes','string','max:10', Rule::unique('students')->ignore($student->id)],
+            'nisn' => ['sometimes','string','max:10', Rule::unique('students','nisn')->ignore($student->id)->where('status','aktif')->whereNull('deleted_at')],
             'nis' => 'sometimes|string|max:20',
             'jk' => 'sometimes|in:L,P',
             'class_id' => 'sometimes|nullable|exists:classes,id',
@@ -405,9 +405,24 @@ class MasterController extends Controller
      */
     public function destroyStudent(Student $student): JsonResponse
     {
-        // Hapus akun user terkait jika ada
+        // Hapus akun user terkait jika ada — beserta relasinya (cegah FK constraint)
         if ($student->user_id) {
-            \App\Models\User::where('id', $student->user_id)->delete();
+            $user = \App\Models\User::find($student->user_id);
+            if ($user) {
+                $user->notifications()->delete();
+                $user->classSubjectsAsTeacher()->delete();
+                $user->createdGrades()->delete();
+                $user->createdQuestions()->delete();
+                $user->createdExams()->delete();
+                $user->verifiedPayments()->delete();
+                $user->createdInvoices()->delete();
+                $user->createdQuestionBanks()->delete();
+                $user->createdP5Projects()->delete();
+                $user->createdP5Assessments()->delete();
+                $user->createdAttendances()->delete();
+                $user->teacherAssignments()->delete();
+                $user->delete();
+            }
         }
 
         // Hapus data siswa

@@ -12,6 +12,7 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class FinanceController extends Controller
 {
@@ -28,7 +29,7 @@ class FinanceController extends Controller
     public function storeFeeType(Request $request)
     {
         $data = $request->validate([
-            'code' => 'required|string|max:30|unique:fee_types,code',
+            'code' => ['required','string','max:30', Rule::unique('fee_types','code')],
             'name' => 'required|string|max:150',
             'category' => 'required|in:rutin,tidak_rutin',
             'nominal' => 'required|numeric|min:0',
